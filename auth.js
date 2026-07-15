@@ -1,68 +1,72 @@
 /**
- * Impact Quest – Auth Module
- * Uses the global `supabase` client from supabase-client.js
+ * Impact Quest – Authentication Module
+ * Uses the global window.supabaseClient from config.js
  */
 
 // ---------- Registration ----------
 async function registerUser(email, password, displayName) {
-  const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await window.supabaseClient.auth.signUp({
     email,
     password,
     options: {
       data: {
         display_name: displayName,
       },
-      emailRedirectTo: `${window.location.origin}/email-verified.html`,
+      emailRedirectTo: `${window.location.origin}/ProjectImpactQuest/email-verified.html`,
     },
   });
+
   return { data, error };
 }
 
 // ---------- Login ----------
 async function loginUser(email, password) {
-  const { data, error } = await supabase.auth.signInWithPassword({
+  return await window.supabaseClient.auth.signInWithPassword({
     email,
     password,
   });
-  return { data, error };
 }
 
 // ---------- Logout ----------
 async function logoutUser() {
-  const { error } = await supabase.auth.signOut();
-  if (error) console.error('Logout error:', error);
-  window.location.href = '/index.html';
+  const { error } = await window.supabaseClient.auth.signOut();
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  window.location.href = "login.html";
 }
 
-// ---------- Get current session/user ----------
+// ---------- Current User ----------
 async function getCurrentUser() {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await window.supabaseClient.auth.getUser();
+
   return user;
 }
 
-// ---------- Send password reset email ----------
+// ---------- Password Reset ----------
 async function sendPasswordReset(email) {
-  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/reset-password.html`,
+  return await window.supabaseClient.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/ProjectImpactQuest/reset-password.html`,
   });
-  return { data, error };
 }
 
-// ---------- Update password (after reset) ----------
-async function updatePassword(newPassword) {
-  const { data, error } = await supabase.auth.updateUser({
-    password: newPassword,
+// ---------- Update Password ----------
+async function updatePassword(password) {
+  return await window.supabaseClient.auth.updateUser({
+    password,
   });
-  return { data, error };
 }
 
-// ---------- Listen for auth state changes ----------
-supabase.auth.onAuthStateChange((event, session) => {
-  // Optional: handle session changes globally
-  if (event === 'SIGNED_IN') {
-    console.log('User signed in:', session.user.email);
-  }
-  if (event === 'SIGNED_OUT') {
-    console.log('User signed out');
+// ---------- Auth Listener ----------
+window.supabaseClient.auth.onAuthStateChange((event, session) => {
+  console.log("Auth Event:", event);
+
+  if (session) {
+    console.log("Logged in:", session.user.email);
   }
 });

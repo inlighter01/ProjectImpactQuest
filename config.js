@@ -21,16 +21,9 @@ if (!window.supabase) {
   console.error("❌ Supabase library failed to load.");
 } else {
   // Create the client ONLY ONCE
-  if (!window.supabaseClient) {
-    window.supabaseClient = window.supabase.createClient(
-      SUPABASE_URL,
-      SUPABASE_ANON_KEY
-    );
-    console.log("✅ Supabase client initialized.");
-  } else {
-    console.log("ℹ️ Existing Supabase client reused.");
-  }
+ if (!window.supabaseClient) {
+  window.supabaseClient = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+  );
 }
-
-// Global client used everywhere
-const supabase = window.supabaseClient;

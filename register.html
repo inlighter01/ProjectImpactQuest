@@ -108,10 +108,10 @@
         // create the profile automatically on the user's first visit.
         if (data?.user) {
           try {
-            await supabase.from('profiles').insert({
-              user_id: data.user.id,
-              display_name: displayName,
-            });
+            await window.supabaseClient.from('profiles').insert({
+    user_id: data.user.id,
+    display_name: displayName,
+});
           } catch (profileErr) {
             console.warn('Profile creation deferred:', profileErr);
           }

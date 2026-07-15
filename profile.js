@@ -5,7 +5,7 @@
 
 // ---------- Get or create profile ----------
 async function getOrCreateProfile(user) {
-  const { data: existing, error: fetchError } = await supabase
+  const { data: existing, error: fetchError } = await window.supabaseClient
     .from('profiles')
     .select('*')
     .eq('user_id', user.id)
@@ -14,7 +14,7 @@ async function getOrCreateProfile(user) {
   if (existing) return existing;
 
   // If no profile exists (e.g., user registered before this table was created), create one
-  const { data: created, error: insertError } = await supabase
+  const { data: created, error: insertError } = await window.supabaseClient
     .from('profiles')
     .insert({
       user_id: user.id,
@@ -30,7 +30,7 @@ async function getOrCreateProfile(user) {
 
 // ---------- Update profile ----------
 async function updateProfile(userId, updates) {
-  const { data, error } = await supabase
+  const { data, error } = await window.supabaseClient
     .from('profiles')
     .update(updates)
     .eq('user_id', userId)
