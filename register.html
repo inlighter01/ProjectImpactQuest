@@ -99,6 +99,8 @@
       }
 
       const { data, error } = await registerUser(email, password, displayName);
+      console.log("REGISTER DATA:", data);
+console.log("REGISTER ERROR:", error);
       if (error) {
         errorEl.textContent = error.message || 'Registration failed. Please try again.';
         errorEl.classList.remove('hidden');
