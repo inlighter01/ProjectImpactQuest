@@ -1,1 +1,183 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>My Quests · Impact Quest</title><link rel="stylesheet" href="style.css"></head><body><main class="quest-container"><a class="auth-back" href="profile.html">← Profile</a><header class="page-header page-header-row"><div><p class="eyebrow">Quest Giver Hub</p><h1>My Community Quests</h1><p>Draft ideas, submitted requests, and their review status.</p></div><a class="btn btn-primary" href="create-quest.html">Create a Quest</a></header><section id="questList" class="quest-list" aria-live="polite"><p>Loading your quests…</p></section></main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="auth.js"></script><script src="quest.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Quests · Impact Quest</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0e27">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="quest-container">
+  <a class="auth-back" href="profile.html">← Profile</a>
+  <header class="page-header page-header-row">
+    <div>
+      <p class="eyebrow">Quest Giver &amp; Volunteer Hub</p>
+      <h1>My Quests</h1>
+      <p>Everything you've created, joined, completed, or cancelled — in one place.</p>
+    </div>
+    <a class="btn btn-primary" href="create-quest.html">Create a Quest</a>
+  </header>
+
+  <p id="myQuestsMessage" class="quest-message" hidden aria-live="polite"></p>
+
+  <nav class="tab-row" role="tablist" aria-label="My Quests categories">
+    <button class="tab-btn active" data-tab="created" role="tab" aria-selected="true">Created</button>
+    <button class="tab-btn" data-tab="joined" role="tab" aria-selected="false">Joined</button>
+    <button class="tab-btn" data-tab="completed" role="tab" aria-selected="false">Completed</button>
+    <button class="tab-btn" data-tab="cancelled" role="tab" aria-selected="false">Cancelled</button>
+  </nav>
+
+  <section class="tab-panel active" id="panel-created" role="tabpanel"><div class="quest-list" id="list-created"><p class="quest-message">Loading…</p></div></section>
+  <section class="tab-panel" id="panel-joined" role="tabpanel"><div class="quest-list" id="list-joined"></div></section>
+  <section class="tab-panel" id="panel-completed" role="tabpanel"><div class="quest-list" id="list-completed"></div></section>
+  <section class="tab-panel" id="panel-cancelled" role="tabpanel"><div class="quest-list" id="list-cancelled"></div></section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="participation.js"></script>
+<script>
+(function () {
+  "use strict";
+  const P = window.IQParticipation;
+  const safe = P.safe;
+  const loaded = { created: false, joined: false, completed: false, cancelled: false };
+  let user = null;
+
+  function say(text, type = "error") {
+    const el = document.getElementById("myQuestsMessage");
+    el.textContent = text; el.className = `quest-message ${type}`; el.hidden = false;
+  }
+
+  function formatStatus(status) {
+    return String(status).replace(/(^|_)([a-z])/g, (_, __, c) => ` ${c.toUpperCase()}`).trim();
+  }
+
+  function createdCard(q) {
+    return `<article class="quest-card">
+      <span class="status-pill ${safe(q.status)}">${safe(formatStatus(q.status))}</span>
+      <h2>${safe(q.title)}</h2>
+      <p class="quest-meta">${safe(q.category)} · ${safe(q.city)}, ${safe(q.barangay)}</p>
+      <p>${q.joined_count || 0}/${q.volunteer_limit} volunteers · ${q.quest_date ? "Scheduled for " + safe(q.quest_date) : "Schedule to be confirmed"}</p>
+      <div class="form-actions">
+        <a class="btn btn-outline" href="quest-details.html?id=${encodeURIComponent(q.id)}">View</a>
+        ${q.status === "approved" ? `<a class="btn btn-outline" href="quest-lobby.html?id=${encodeURIComponent(q.id)}">Lobby</a>` : ""}
+      </div>
+    </article>`;
+  }
+
+  function joinedCard(row) {
+    const q = row.quests;
+    return `<article class="quest-card">
+      <span class="status-pill approved">Joined</span>
+      <h2>${safe(q.title)}</h2>
+      <p class="quest-meta">${safe(q.category)} · ${safe(q.city)}, ${safe(q.barangay)}</p>
+      <p>${q.quest_date ? "Scheduled for " + safe(q.quest_date) : "Schedule to be confirmed"} · Joined ${P.timeAgo(row.joined_at)}</p>
+      <div class="form-actions">
+        <a class="btn btn-outline" href="quest-details.html?id=${encodeURIComponent(q.id)}">View</a>
+        <a class="btn btn-outline" href="quest-lobby.html?id=${encodeURIComponent(q.id)}">Lobby</a>
+      </div>
+    </article>`;
+  }
+
+  function completedOrCancelledCard(row, kind) {
+    const q = row.quests;
+    return `<article class="quest-card">
+      <span class="status-pill ${kind === "completed" ? "approved" : "draft"}">${kind === "completed" ? "Completed" : "Cancelled"}</span>
+      <h2>${safe(q.title)}</h2>
+      <p class="quest-meta">${safe(q.category)} · ${safe(q.city)}, ${safe(q.barangay)}</p>
+      <a class="btn btn-outline" href="quest-details.html?id=${encodeURIComponent(q.id)}">View</a>
+    </article>`;
+  }
+
+  function emptyState(text, ctaHref, ctaLabel) {
+    return `<section class="empty-state"><h2>${safe(text)}</h2>${ctaHref ? `<a class="btn btn-primary" href="${ctaHref}">${safe(ctaLabel)}</a>` : ""}</section>`;
+  }
+
+  async function loadCreated() {
+    const el = document.getElementById("list-created");
+    const { data, error } = await window.supabaseClient
+      .from("quests")
+      .select("id,title,category,city,barangay,status,quest_date,joined_count,volunteer_limit,created_at")
+      .eq("creator_id", user.id)
+      .not("status", "in", "(cancelled,completed)")
+      .order("created_at", { ascending: false });
+    if (error) { el.innerHTML = `<p class="quest-message error">${safe(error.message)}</p>`; return; }
+    el.innerHTML = data.length ? data.map(createdCard).join("") : emptyState("Your first quest can start a ripple.", "create-quest.html", "Create a Quest");
+  }
+
+  async function loadJoined() {
+    const el = document.getElementById("list-joined");
+    const { data, error } = await window.supabaseClient
+      .from("quest_participants")
+      .select("joined_at,quests:quest_id(id,title,category,city,barangay,quest_date,status)")
+      .eq("user_id", user.id)
+      .eq("status", "joined")
+      .order("joined_at", { ascending: false });
+    if (error) { el.innerHTML = `<p class="quest-message error">${safe(error.message)}</p>`; return; }
+    const rows = (data || []).filter((r) => r.quests);
+    el.innerHTML = rows.length ? rows.map(joinedCard).join("") : emptyState("You haven't joined a quest yet.", "community-feed.html", "Browse Community Quests");
+  }
+
+  async function loadByStatus(status, containerId) {
+    const el = document.getElementById(containerId);
+    const [participation, organized] = await Promise.all([
+      window.supabaseClient
+        .from("quest_participants")
+        .select("joined_at,left_at,quests:quest_id(id,title,category,city,barangay,status)")
+        .eq("user_id", user.id)
+        .eq("status", status)
+        .order("joined_at", { ascending: false }),
+      window.supabaseClient
+        .from("quests")
+        .select("id,title,category,city,barangay,status,updated_at")
+        .eq("creator_id", user.id)
+        .eq("status", status)
+        .order("updated_at", { ascending: false }),
+    ]);
+    if (participation.error) { el.innerHTML = `<p class="quest-message error">${safe(participation.error.message)}</p>`; return; }
+    const asParticipant = (participation.data || []).filter((r) => r.quests).map((r) => ({ quests: r.quests }));
+    const asOrganizer = (organized.error ? [] : organized.data || []).map((q) => ({ quests: q }));
+    const seen = new Set();
+    const rows = [...asOrganizer, ...asParticipant].filter((r) => (seen.has(r.quests.id) ? false : (seen.add(r.quests.id), true)));
+    if (!rows.length) {
+      el.innerHTML = emptyState(
+        status === "completed" ? "No completed quests yet." : "No cancelled quests.",
+        status === "completed" ? "community-feed.html" : null,
+        status === "completed" ? "Find a quest to join" : null
+      );
+      return;
+    }
+    el.innerHTML = rows.map((r) => completedOrCancelledCard(r, status)).join("");
+  }
+
+  function activateTab(tab) {
+    document.querySelectorAll(".tab-btn").forEach((b) => { const active = b.dataset.tab === tab; b.classList.toggle("active", active); b.setAttribute("aria-selected", active); });
+    document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("active", p.id === `panel-${tab}`));
+    if (!loaded[tab]) {
+      loaded[tab] = true;
+      if (tab === "created") loadCreated();
+      if (tab === "joined") loadJoined();
+      if (tab === "completed") loadByStatus("completed", "list-completed");
+      if (tab === "cancelled") loadByStatus("cancelled", "list-cancelled");
+    }
+  }
+
+  async function init() {
+    user = await P.currentUserOrNull();
+    if (!user) { location.href = "login.html?next=" + encodeURIComponent(location.pathname); return; }
+    document.querySelectorAll(".tab-btn").forEach((b) => b.addEventListener("click", () => activateTab(b.dataset.tab)));
+    activateTab("created");
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+})();
+</script>
+</body>
+</html>

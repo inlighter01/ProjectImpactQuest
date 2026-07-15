@@ -1,1 +1,304 @@
-<!doctype html><html><head><meta charset='utf-8'><title>Quest Details</title></head><body><h1>Quest Details</h1></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quest Details · Impact Quest</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0e27">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="quest-container">
+  <a class="auth-back" href="community-feed.html">← Community Quests</a>
+
+  <p id="questMessage" class="quest-message" hidden aria-live="polite"></p>
+
+  <div id="questDetail" hidden>
+    <div class="quest-banner"><span class="eyebrow" id="qCategory">Category</span></div>
+
+    <header class="page-header page-header-row">
+      <div>
+        <p class="eyebrow" id="qStatus">Approved</p>
+        <h1 id="qTitle">Loading quest…</h1>
+        <p class="quest-meta" id="qLocation"></p>
+      </div>
+      <div class="icon-btn-row">
+        <button class="btn btn-outline" id="bookmarkBtn" type="button" aria-pressed="false">☆ Save</button>
+        <button class="btn btn-outline" id="shareBtn" type="button">Share</button>
+      </div>
+    </header>
+
+    <div class="quest-detail-grid">
+      <section>
+        <article class="quest-card">
+          <h2>Why it matters</h2>
+          <p id="qWhy"></p>
+          <h2>Quest details</h2>
+          <p id="qDescription"></p>
+          <dl class="quest-details-list">
+            <div><dt>Date</dt><dd id="qDate">—</dd></div>
+            <div><dt>Time</dt><dd id="qTime">—</dd></div>
+            <div><dt>Duration</dt><dd id="qDuration">—</dd></div>
+            <div><dt>Meeting point</dt><dd id="qMeetingPoint">—</dd></div>
+            <div><dt>Verification method</dt><dd id="qVerification">—</dd></div>
+          </dl>
+        </article>
+
+        <article class="quest-card" id="safetyCard" hidden>
+          <h2>Safety notes</h2>
+          <div class="safety-notice"><p id="qSafety"></p></div>
+        </article>
+
+        <article class="quest-card" id="organizerParticipantsCard" hidden>
+          <div class="page-header-row">
+            <h2>Participants</h2>
+            <a class="btn btn-outline" href="#" id="lobbyLinkFromParticipants">Open Quest Lobby</a>
+          </div>
+          <p class="quest-meta">Only visible to you because you organize this quest.</p>
+          <div id="participantList" class="participant-list"><p class="quest-message">Loading participants…</p></div>
+        </article>
+      </section>
+
+      <aside class="quest-sidebar">
+        <article class="quest-card">
+          <h2>Organizer</h2>
+          <div class="organizer-card">
+            <div class="avatar-sm" id="orgAvatar">?</div>
+            <div>
+              <p style="margin:0;font-weight:700" id="orgName">—</p>
+              <p class="quest-meta" id="orgVerified"></p>
+            </div>
+          </div>
+        </article>
+
+        <article class="quest-card">
+          <h2>Volunteers</h2>
+          <div class="slot-meter">
+            <div class="slot-meter-bar"><div class="slot-meter-bar-fill" id="slotFill"></div></div>
+            <p class="quest-meta" id="slotText">0 of 0 spots filled</p>
+          </div>
+          <button class="btn btn-primary btn-join" id="joinBtn" type="button" data-state="idle">
+            <span class="btn-join-label">Join Quest</span>
+          </button>
+          <p id="joinHint" class="quest-meta" style="margin-top:.6rem"></p>
+          <a class="btn btn-outline" href="#" id="lobbyLink" style="width:100%;margin-top:.6rem;box-sizing:border-box">Open Quest Lobby</a>
+        </article>
+      </aside>
+    </div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="participation.js"></script>
+<script>
+(function () {
+  "use strict";
+  const P = window.IQParticipation;
+  const questId = new URLSearchParams(location.search).get("id");
+  const detailEl = document.getElementById("questDetail");
+  const msgEl = document.getElementById("questMessage");
+  const joinBtn = document.getElementById("joinBtn");
+  const joinHint = document.getElementById("joinHint");
+  let currentUser = null;
+  let currentQuest = null;
+  let unsubQuest = null;
+
+  function say(text, type = "error") {
+    msgEl.textContent = text;
+    msgEl.className = `quest-message ${type}`;
+    msgEl.hidden = false;
+  }
+
+  function formatDate(d) {
+    if (!d) return "To be confirmed";
+    return new Date(d + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  }
+
+  function renderSlots(quest) {
+    const remaining = P.slotsRemaining(quest);
+    const pct = quest.volunteer_limit ? Math.min(100, Math.round((quest.joined_count / quest.volunteer_limit) * 100)) : 0;
+    document.getElementById("slotFill").style.width = pct + "%";
+    document.getElementById("slotFill").classList.toggle("full", P.isFull(quest));
+    document.getElementById("slotText").textContent = `${quest.joined_count || 0} of ${quest.volunteer_limit || 0} spots filled · ${remaining} remaining`;
+  }
+
+  async function renderJoinState(quest) {
+    if (!currentUser) {
+      joinBtn.dataset.state = "idle";
+      joinBtn.querySelector(".btn-join-label").textContent = "Join Quest";
+      joinHint.textContent = "Sign in to join this quest.";
+      return;
+    }
+    if (quest.creator_id === currentUser.id) {
+      joinBtn.disabled = true;
+      joinBtn.dataset.state = "idle";
+      joinBtn.querySelector(".btn-join-label").textContent = "You organize this quest";
+      joinHint.textContent = "";
+      return;
+    }
+    const participation = await P.getMyParticipation(quest.id, currentUser.id);
+    if (participation) {
+      joinBtn.disabled = false;
+      joinBtn.dataset.state = "joined";
+      joinBtn.querySelector(".btn-join-label").textContent = "Joined ✓";
+      joinHint.textContent = "Hover the button to leave this quest.";
+    } else if (P.isFull(quest)) {
+      joinBtn.disabled = true;
+      joinBtn.dataset.state = "full";
+      joinBtn.querySelector(".btn-join-label").textContent = "Quest Full";
+      joinHint.textContent = "All volunteer slots are taken. Check back if someone leaves.";
+    } else {
+      joinBtn.disabled = false;
+      joinBtn.dataset.state = "idle";
+      joinBtn.querySelector(".btn-join-label").textContent = "Join Quest";
+      joinHint.textContent = "";
+    }
+  }
+
+  async function handleJoinClick() {
+    const state = joinBtn.dataset.state;
+    joinBtn.disabled = true;
+    const prevLabel = joinBtn.querySelector(".btn-join-label").textContent;
+    joinBtn.dataset.state = "loading";
+    joinBtn.querySelector(".btn-join-label").textContent = "Please wait…";
+
+    if (state === "joined") {
+      const { error } = await P.leaveQuest(currentQuest.id);
+      if (error) { say(error.message); joinBtn.dataset.state = "joined"; joinBtn.querySelector(".btn-join-label").textContent = prevLabel; joinBtn.disabled = false; return; }
+    } else {
+      const { error } = await P.joinQuest(currentQuest.id);
+      if (error) { say(error.message); joinBtn.dataset.state = "idle"; joinBtn.querySelector(".btn-join-label").textContent = prevLabel; joinBtn.disabled = false; return; }
+    }
+    const { data: fresh } = await P.fetchQuest(currentQuest.id);
+    currentQuest = fresh;
+    renderSlots(fresh);
+    await renderJoinState(fresh);
+    if (document.getElementById("organizerParticipantsCard").hidden === false) loadParticipants();
+  }
+
+  async function loadParticipants() {
+    const el = document.getElementById("participantList");
+    const { data, error } = await P.loadParticipants(currentQuest.id);
+    if (error) { el.innerHTML = `<p class="quest-message error">Could not load participants: ${P.safe(error.message)}</p>`; return; }
+    if (!data.length) { el.innerHTML = `<p class="quest-message">No one has joined yet. Share this quest to find volunteers.</p>`; return; }
+    el.innerHTML = data.map((row) => {
+      const p = row.profiles || {};
+      const initial = (p.display_name || "?")[0].toUpperCase();
+      return `<div class="participant-row">
+        <div class="avatar-sm">${P.safe(initial)}</div>
+        <div class="participant-info">
+          <div class="participant-name">${P.safe(p.display_name || "Community member")}</div>
+          <div class="participant-meta">${P.verificationBadge(p.verification_status)} ${P.formatTrust(p.trust_score)} <span>Joined ${P.timeAgo(row.joined_at)}</span></div>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  async function loadBookmarkState() {
+    const btn = document.getElementById("bookmarkBtn");
+    if (!currentUser) return;
+    const { data } = await window.supabaseClient.from("quest_bookmarks").select("id").eq("quest_id", currentQuest.id).eq("user_id", currentUser.id).maybeSingle();
+    btn.dataset.bookmarked = data ? "1" : "0";
+    btn.setAttribute("aria-pressed", data ? "true" : "false");
+    btn.textContent = data ? "★ Saved" : "☆ Save";
+  }
+
+  async function toggleBookmark() {
+    const btn = document.getElementById("bookmarkBtn");
+    if (!currentUser) { location.href = `login.html?next=${encodeURIComponent(location.pathname + location.search)}`; return; }
+    btn.disabled = true;
+    if (btn.dataset.bookmarked === "1") {
+      await window.supabaseClient.from("quest_bookmarks").delete().eq("quest_id", currentQuest.id).eq("user_id", currentUser.id);
+    } else {
+      await window.supabaseClient.from("quest_bookmarks").insert({ quest_id: currentQuest.id, user_id: currentUser.id });
+    }
+    btn.disabled = false;
+    loadBookmarkState();
+  }
+
+  async function shareQuest() {
+    const url = window.location.href;
+    if (navigator.share) {
+      try { await navigator.share({ title: currentQuest.title, text: currentQuest.why_it_matters, url }); return; } catch (e) { return; }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      const btn = document.getElementById("shareBtn");
+      const original = btn.textContent;
+      btn.textContent = "Link copied!";
+      setTimeout(() => { btn.textContent = original; }, 1800);
+    } catch (e) {
+      say("Copy this page's URL to share this quest.", "info");
+    }
+  }
+
+  async function init() {
+    if (!questId) { say("No quest was specified."); return; }
+    currentUser = await P.currentUserOrNull();
+
+    const { data: quest, error } = await P.fetchQuest(questId);
+    if (error || !quest) { say("This quest could not be found."); return; }
+    if (quest.status !== "approved" && quest.creator_id !== currentUser?.id) {
+      say("This quest is not currently visible to the community.");
+      return;
+    }
+    currentQuest = quest;
+
+    document.getElementById("qCategory").textContent = quest.category;
+    document.getElementById("qStatus").textContent = quest.status === "approved" ? "Approved community quest" : quest.status;
+    document.title = `${quest.title} · Impact Quest`;
+    document.getElementById("qTitle").textContent = quest.title;
+    document.getElementById("qLocation").textContent = `${quest.city}, ${quest.barangay}`;
+    document.getElementById("qWhy").textContent = quest.why_it_matters;
+    document.getElementById("qDescription").textContent = quest.description;
+    document.getElementById("qDate").textContent = formatDate(quest.quest_date);
+    document.getElementById("qTime").textContent = quest.quest_time || "To be confirmed";
+    document.getElementById("qDuration").textContent = quest.duration || "Not specified";
+    document.getElementById("qMeetingPoint").textContent = quest.meeting_point || "Shared after you join";
+    document.getElementById("qVerification").textContent = quest.verification_method;
+
+    if (quest.safety_notes) { document.getElementById("safetyCard").hidden = false; document.getElementById("qSafety").textContent = quest.safety_notes; }
+
+    const { data: organizer } = await window.supabaseClient.from("profiles").select("display_name,verification_status").eq("user_id", quest.creator_id).single();
+    if (organizer) {
+      document.getElementById("orgAvatar").textContent = (organizer.display_name || "?")[0].toUpperCase();
+      document.getElementById("orgName").textContent = organizer.display_name || "Community organizer";
+      document.getElementById("orgVerified").innerHTML = P.verificationBadge(organizer.verification_status);
+    }
+
+    document.getElementById("lobbyLink").href = `quest-lobby.html?id=${encodeURIComponent(quest.id)}`;
+    document.getElementById("lobbyLinkFromParticipants").href = `quest-lobby.html?id=${encodeURIComponent(quest.id)}`;
+
+    renderSlots(quest);
+    await renderJoinState(quest);
+    await loadBookmarkState();
+
+    if (currentUser && currentUser.id === quest.creator_id) {
+      document.getElementById("organizerParticipantsCard").hidden = false;
+      loadParticipants();
+    }
+
+    unsubQuest = P.subscribeToQuest(quest.id, (updated) => {
+      currentQuest = { ...currentQuest, ...updated };
+      renderSlots(currentQuest);
+      renderJoinState(currentQuest);
+    });
+
+    detailEl.hidden = false;
+    joinBtn.addEventListener("click", handleJoinClick);
+    document.getElementById("bookmarkBtn").addEventListener("click", toggleBookmark);
+    document.getElementById("shareBtn").addEventListener("click", shareQuest);
+  }
+
+  window.addEventListener("beforeunload", () => { if (unsubQuest) unsubQuest(); });
+  document.addEventListener("DOMContentLoaded", init);
+})();
+</script>
+</body>
+</html>

@@ -18,7 +18,11 @@
       <div class="avatar-placeholder" id="avatar">?</div>
       <h1 id="display-name">Loading…</h1>
       <p id="user-email" class="text-muted"></p>
-      <div class="profile-actions" style="margin-top: var(--space-sm);">
+      <div class="profile-actions" style="margin-top: var(--space-sm); align-items:center;">
+        <span class="notif-bell-wrap">
+          <a href="notifications.html" class="notif-bell" id="notifBell" aria-label="Notifications">🔔</a>
+          <span class="notif-badge" id="notifBadge" hidden>0</span>
+        </span>
         <a href="community-feed.html" class="btn btn--primary">Explore Quests</a>
         <a href="my-quests.html" class="btn btn--secondary">My Quests</a>
         <a href="create-quest.html" class="btn btn--secondary">Create a Quest</a>
@@ -70,24 +74,15 @@
       <p id="profile-availability" class="text-muted">Not set</p>
     </div>
 
-    <!-- Trust & Reputation Placeholders -->
+    <!-- Trust & Reputation -->
     <div class="profile-card glass-card" style="margin-top: var(--space-md);">
       <h3>Trust & Reputation</h3>
-      <div class="placeholder-stats">
-        <div class="placeholder-stat">
-          <span class="stat-value">—</span>
-          <span class="stat-label">Trust Score</span>
-        </div>
-        <div class="placeholder-stat">
-          <span class="stat-value">—</span>
-          <span class="stat-label">Reliability</span>
-        </div>
-        <div class="placeholder-stat">
-          <span class="stat-value">—</span>
-          <span class="stat-label">Community Rep</span>
-        </div>
+      <div class="rep-stats">
+        <div class="rep-stat"><strong id="stat-trust-score">0.0</strong><span>Trust Score</span></div>
+        <div class="rep-stat"><strong id="stat-impact-points">0</strong><span>Impact Points</span></div>
+        <div class="rep-stat"><strong id="stat-people-helped">0</strong><span>People Helped</span></div>
       </div>
-      <p class="caption">These metrics will appear once you start completing quests.</p>
+      <p class="caption" id="rep-caption">These metrics grow as you join and complete quests.</p>
     </div>
 
     <!-- Community Badges -->
@@ -101,22 +96,13 @@
       <p class="caption">Badges are earned through participation and trust.</p>
     </div>
 
-    <!-- Quest Statistics (Placeholder) -->
+    <!-- Quest Statistics -->
     <div class="profile-card glass-card" style="margin-top: var(--space-md);">
       <h3>Quest Statistics</h3>
-      <div class="placeholder-stats">
-        <div class="placeholder-stat">
-          <span class="stat-value">—</span>
-          <span class="stat-label">Quests Completed</span>
-        </div>
-        <div class="placeholder-stat">
-          <span class="stat-value">—</span>
-          <span class="stat-label">People Helped</span>
-        </div>
-        <div class="placeholder-stat">
-          <span class="stat-value">—</span>
-          <span class="stat-label">Hours Contributed</span>
-        </div>
+      <div class="rep-stats">
+        <div class="rep-stat"><strong id="stat-joined">0</strong><span>Quests Joined</span></div>
+        <div class="rep-stat"><strong id="stat-completed">0</strong><span>Quests Completed</span></div>
+        <div class="rep-stat"><a class="btn btn--secondary" href="my-quests.html" style="width:100%;box-sizing:border-box">View My Quests</a></div>
       </div>
     </div>
 
@@ -137,6 +123,8 @@
   <script src="config.js"></script>
   <script src="auth.js"></script>
   <script src="profile.js"></script>
+  <script src="participation.js"></script>
+  <script src="notifications.js"></script>
   <script>
     if (!isConfigured) window.location.href = 'index.html';
 
@@ -192,6 +180,13 @@
         document.getElementById('completion-bar').style.width = percent + '%';
         document.getElementById('completion-text').textContent = percent + '% complete';
 
+        // Reputation + quest statistics (populated by the v0.10.0 participation triggers)
+        document.getElementById('stat-trust-score').textContent = Number(profile.trust_score || 0).toFixed(1);
+        document.getElementById('stat-impact-points').textContent = profile.impact_points || 0;
+        document.getElementById('stat-people-helped').textContent = profile.people_helped_count || 0;
+        document.getElementById('stat-joined').textContent = profile.joined_quests_count || 0;
+        document.getElementById('stat-completed').textContent = profile.completed_quests_count || 0;
+
         // Badges placeholder (static for now)
         // Already in HTML
 
@@ -202,6 +197,7 @@
     }
 
     loadProfile();
+    if (window.IQNotifications) window.IQNotifications.mountBell();
   </script>
 </body>
 </html>

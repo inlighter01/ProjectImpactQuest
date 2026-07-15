@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notifications · Impact Quest</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0e27">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="quest-container">
+  <a class="auth-back" href="profile.html">← Profile</a>
+  <header class="page-header page-header-row">
+    <div>
+      <p class="eyebrow">Stay in the loop</p>
+      <h1>Notifications</h1>
+    </div>
+    <button class="btn btn-outline" id="markAllBtn" type="button">Mark all as read</button>
+  </header>
+  <p id="notifMessage" class="quest-message" hidden aria-live="polite"></p>
+  <div id="notifList" class="notif-list"><p class="quest-message">Loading notifications…</p></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="participation.js"></script>
+<script src="notifications.js"></script>
+<script>
+(function () {
+  "use strict";
+  const N = window.IQNotifications;
+  const P = window.IQParticipation;
+  let user = null;
+
+  function questLink(id) { return id ? `<a class="btn btn-outline" href="quest-details.html?id=${encodeURIComponent(id)}" style="margin-top:.5rem;display:inline-block">View quest</a>` : ""; }
+
+  function row(n) {
+    return `<div class="notif-item ${n.is_read ? "" : "unread"}" data-id="${n.id}">
+      <div style="font-size:1.3rem">${N.ICONS[n.type] || "🔔"}</div>
+      <div class="notif-item-body">
+        <strong>${P.safe(n.title)}</strong>
+        <p style="margin:.25rem 0">${P.safe(n.body)}</p>
+        ${questLink(n.quest_id)}
+        <div><time>${P.timeAgo(n.created_at)}</time></div>
+      </div>
+      ${n.is_read ? "" : `<button class="btn btn-outline" data-mark="${n.id}" style="align-self:start">Mark read</button>`}
+    </div>`;
+  }
+
+  async function render() {
+    const el = document.getElementById("notifList");
+    const { data, error, user: u } = await N.loadNotifications();
+    user = u;
+    if (!user) { location.href = "login.html?next=" + encodeURIComponent(location.pathname); return; }
+    if (error) { el.innerHTML = `<p class="quest-message error">${P.safe(error.message)}</p>`; return; }
+    el.innerHTML = data.length ? data.map(row).join("") : `<section class="empty-state"><h2>You're all caught up.</h2><p>Notifications about your quests will show up here.</p></section>`;
+    el.querySelectorAll("[data-mark]").forEach((btn) => btn.addEventListener("click", async () => {
+      await N.markRead(btn.dataset.mark);
+      render();
+    }));
+  }
+
+  document.addEventListener("DOMContentLoaded", async () => {
+    await render();
+    document.getElementById("markAllBtn").addEventListener("click", async () => {
+      if (user) { await N.markAllRead(user.id); render(); }
+    });
+  });
+})();
+</script>
+</body>
+</html>

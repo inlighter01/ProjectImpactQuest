@@ -1,1 +1,207 @@
-<html><head><title>Quest Lobby</title></head><body><h1>Quest Lobby</h1><p>Coordinate with volunteers.</p></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quest Lobby · Impact Quest</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0e27">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="quest-container">
+  <a class="auth-back" id="backLink" href="community-feed.html">← Quest Details</a>
+  <p id="lobbyMessage" class="quest-message" hidden aria-live="polite"></p>
+
+  <div id="lobby" hidden>
+    <header class="page-header">
+      <p class="eyebrow">Quest Lobby</p>
+      <h1 id="lTitle">Loading…</h1>
+      <p class="quest-meta" id="lMeta"></p>
+    </header>
+
+    <article class="quest-card" id="notJoinedNotice" hidden>
+      <p>You'll see full meeting details and can post here once you <a id="joinFromLobby" href="#">join this quest</a>.</p>
+    </article>
+
+    <div id="lobbyBody" hidden>
+      <article class="quest-card">
+        <h2>Countdown to quest day</h2>
+        <div class="lobby-countdown" id="countdown">
+          <div class="countdown-cell"><strong id="cdDays">–</strong><span>Days</span></div>
+          <div class="countdown-cell"><strong id="cdHours">–</strong><span>Hours</span></div>
+          <div class="countdown-cell"><strong id="cdMins">–</strong><span>Mins</span></div>
+          <div class="countdown-cell"><strong id="cdSecs">–</strong><span>Secs</span></div>
+        </div>
+        <p class="quest-meta" id="countdownNote"></p>
+      </article>
+
+      <article class="quest-card" id="pinnedCard" hidden>
+        <p class="eyebrow">📣 Pinned announcement</p>
+        <p id="pinnedText"></p>
+      </article>
+
+      <article class="quest-card">
+        <h2>Meeting instructions</h2>
+        <dl class="quest-details-list">
+          <div><dt>Meeting point</dt><dd id="lMeetingPoint">—</dd></div>
+          <div><dt>Date &amp; time</dt><dd id="lWhen">—</dd></div>
+        </dl>
+        <div class="safety-notice" id="lSafetyBox" hidden><p id="lSafety"></p></div>
+      </article>
+
+      <article class="quest-card" id="organizerToolsCard" hidden>
+        <h2>Organizer tools</h2>
+        <label for="announceInput">Post an announcement to everyone who joined</label>
+        <div class="announce-form">
+          <textarea id="announceInput" maxlength="500" placeholder="e.g. Meeting point moved to the covered court entrance."></textarea>
+          <button class="btn btn-primary" id="announceBtn" type="button">Post</button>
+        </div>
+        <div class="form-actions" style="margin-top:1rem">
+          <button class="btn btn-outline" id="cancelQuestBtn" type="button">Cancel this quest</button>
+        </div>
+      </article>
+
+      <article class="quest-card">
+        <h2>Lobby chat</h2>
+        <div class="chat-coming-soon">
+          💬 Live quest chat is coming soon.<br>
+          <span style="font-size:.85rem">For now, use the announcement and activity feed below to stay in sync.</span>
+        </div>
+      </article>
+
+      <article class="quest-card">
+        <h2>Activity</h2>
+        <div id="activityFeed" class="lobby-feed"><p class="quest-message">Loading activity…</p></div>
+      </article>
+    </div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="participation.js"></script>
+<script>
+(function () {
+  "use strict";
+  const P = window.IQParticipation;
+  const questId = new URLSearchParams(location.search).get("id");
+  const msgEl = document.getElementById("lobbyMessage");
+  let currentUser = null;
+  let currentQuest = null;
+  let countdownTimer = null;
+  let unsubActivity = null;
+
+  function say(text, type = "error") { msgEl.textContent = text; msgEl.className = `quest-message ${type}`; msgEl.hidden = false; }
+
+  function startCountdown(quest) {
+    if (!quest.quest_date) { document.getElementById("countdownNote").textContent = "This quest doesn't have a confirmed date yet."; return; }
+    const target = new Date(`${quest.quest_date}T${quest.quest_time || "08:00"}:00`).getTime();
+    function tick() {
+      const diff = target - Date.now();
+      if (diff <= 0) {
+        document.getElementById("countdown").style.opacity = ".5";
+        document.getElementById("countdownNote").textContent = "This quest's scheduled time has arrived.";
+        clearInterval(countdownTimer);
+        return;
+      }
+      const s = Math.floor(diff / 1000);
+      document.getElementById("cdDays").textContent = Math.floor(s / 86400);
+      document.getElementById("cdHours").textContent = String(Math.floor((s % 86400) / 3600)).padStart(2, "0");
+      document.getElementById("cdMins").textContent = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+      document.getElementById("cdSecs").textContent = String(s % 60).padStart(2, "0");
+    }
+    tick();
+    countdownTimer = setInterval(tick, 1000);
+  }
+
+  function activityLine(row) {
+    const icons = { joined: "✅", left: "↩️", announcement: "📣", cancelled: "🚫", system: "ℹ️" };
+    return `<div class="lobby-feed-item">${icons[row.type] || "•"} ${P.safe(row.message)}<time>${P.timeAgo(row.created_at)}</time></div>`;
+  }
+
+  async function loadActivity() {
+    const el = document.getElementById("activityFeed");
+    const { data, error } = await P.loadActivity(currentQuest.id);
+    if (error) { el.innerHTML = `<p class="quest-message error">${P.safe(error.message)}</p>`; return; }
+    el.innerHTML = data.length ? data.map(activityLine).join("") : `<p class="quest-message">No activity yet.</p>`;
+  }
+
+  async function postAnnouncement() {
+    const input = document.getElementById("announceInput");
+    const text = input.value.trim();
+    if (!text) return;
+    const btn = document.getElementById("announceBtn");
+    btn.disabled = true;
+    const { error } = await P.postAnnouncement(currentQuest.id, text);
+    btn.disabled = false;
+    if (error) { say(error.message); return; }
+    input.value = "";
+    document.getElementById("pinnedCard").hidden = false;
+    document.getElementById("pinnedText").textContent = text;
+    loadActivity();
+  }
+
+  async function cancelQuest() {
+    if (!confirm("Cancel this quest? Everyone who joined will be notified and removed.")) return;
+    const reason = prompt("Optional: let volunteers know why this quest is being cancelled.") || null;
+    const { error } = await P.cancelQuest(currentQuest.id, reason);
+    if (error) { say(error.message); return; }
+    say("This quest has been cancelled. Volunteers have been notified.", "success");
+    document.getElementById("organizerToolsCard").hidden = true;
+  }
+
+  async function init() {
+    if (!questId) { say("No quest was specified."); return; }
+    currentUser = await P.currentUserOrNull();
+    if (!currentUser) { location.href = `login.html?next=${encodeURIComponent(location.pathname + location.search)}`; return; }
+
+    const { data: quest, error } = await P.fetchQuest(questId);
+    if (error || !quest) { say("This quest could not be found."); return; }
+    currentQuest = quest;
+
+    document.getElementById("backLink").href = `quest-details.html?id=${encodeURIComponent(quest.id)}`;
+    document.getElementById("joinFromLobby").href = `quest-details.html?id=${encodeURIComponent(quest.id)}`;
+    document.title = `${quest.title} Lobby · Impact Quest`;
+    document.getElementById("lTitle").textContent = quest.title;
+    document.getElementById("lMeta").textContent = `${quest.city}, ${quest.barangay}`;
+
+    const isOrganizer = quest.creator_id === currentUser.id;
+    const participation = isOrganizer ? true : await P.getMyParticipation(quest.id, currentUser.id);
+
+    if (!participation) {
+      document.getElementById("notJoinedNotice").hidden = false;
+      document.getElementById("lobby").hidden = false;
+      return;
+    }
+
+    document.getElementById("lobbyBody").hidden = false;
+    document.getElementById("lMeetingPoint").textContent = quest.meeting_point || "Will be shared closer to the date.";
+    document.getElementById("lWhen").textContent = `${quest.quest_date || "Date TBC"} ${quest.quest_time || ""}`.trim();
+    if (quest.safety_notes) { document.getElementById("lSafetyBox").hidden = false; document.getElementById("lSafety").textContent = quest.safety_notes; }
+    if (quest.pinned_announcement) { document.getElementById("pinnedCard").hidden = false; document.getElementById("pinnedText").textContent = quest.pinned_announcement; }
+
+    startCountdown(quest);
+
+    if (isOrganizer) {
+      document.getElementById("organizerToolsCard").hidden = false;
+      document.getElementById("announceBtn").addEventListener("click", postAnnouncement);
+      document.getElementById("cancelQuestBtn").addEventListener("click", cancelQuest);
+    }
+
+    await loadActivity();
+    unsubActivity = P.subscribeToActivity(quest.id, () => loadActivity());
+
+    document.getElementById("lobby").hidden = false;
+  }
+
+  window.addEventListener("beforeunload", () => { if (countdownTimer) clearInterval(countdownTimer); if (unsubActivity) unsubActivity(); });
+  document.addEventListener("DOMContentLoaded", init);
+})();
+</script>
+</body>
+</html>
