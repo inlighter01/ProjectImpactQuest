@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Profile – Impact Quest</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0a0e27">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="profile-page">
+  <main class="container" style="max-width: 800px; padding-top: var(--space-lg); padding-bottom: var(--space-xl);">
+    <!-- Header -->
+    <div class="profile-header" id="profile-header">
+      <div class="avatar-placeholder" id="avatar">?</div>
+      <h1 id="display-name">Loading…</h1>
+      <p id="user-email" class="text-muted"></p>
+      <div class="profile-actions" style="margin-top: var(--space-sm);">
+        <a href="edit-profile.html" class="btn btn--primary">Edit Profile</a>
+        <a href="public-profile.html" class="btn btn--secondary">View Public Profile</a>
+        <a href="privacy.html" class="btn btn--secondary">Privacy Settings</a>
+        <button onclick="logoutUser()" class="btn btn--secondary">Sign Out</button>
+      </div>
+    </div>
+
+    <!-- Profile Completion Card -->
+    <div class="profile-card glass-card" style="margin-top: var(--space-md);">
+      <h3>Profile Completion</h3>
+      <div class="progress-linear" style="margin: var(--space-xs) 0;">
+        <div class="progress-linear__bar" id="completion-bar" style="width: 0%;"></div>
+      </div>
+      <p id="completion-text" class="caption">0% complete</p>
+    </div>
+
+    <!-- Profile Details -->
+    <div class="profile-card glass-card" style="margin-top: var(--space-md);">
+      <h3>About</h3>
+      <p id="profile-bio" class="text-muted">No bio yet.</p>
+    </div>
+
+    <div class="profile-grid">
+      <div class="profile-card glass-card">
+        <h3>Location</h3>
+        <p id="profile-city" class="text-muted">Not set</p>
+      </div>
+      <div class="profile-card glass-card">
+        <h3>Languages</h3>
+        <p id="profile-languages" class="text-muted">Not set</p>
+      </div>
+      <div class="profile-card glass-card">
+        <h3>Skills</h3>
+        <p id="profile-skills" class="text-muted">Not set</p>
+      </div>
+      <div class="profile-card glass-card">
+        <h3>Interests</h3>
+        <p id="profile-interests" class="text-muted">Not set</p>
+      </div>
+    </div>
+
+    <!-- Availability -->
+    <div class="profile-card glass-card" style="margin-top: var(--space-md);">
+      <h3>Availability</h3>
+      <p id="profile-availability" class="text-muted">Not set</p>
+    </div>
+
+    <!-- Trust & Reputation Placeholders -->
+    <div class="profile-card glass-card" style="margin-top: var(--space-md);">
+      <h3>Trust & Reputation</h3>
+      <div class="placeholder-stats">
+        <div class="placeholder-stat">
+          <span class="stat-value">—</span>
+          <span class="stat-label">Trust Score</span>
+        </div>
+        <div class="placeholder-stat">
+          <span class="stat-value">—</span>
+          <span class="stat-label">Reliability</span>
+        </div>
+        <div class="placeholder-stat">
+          <span class="stat-value">—</span>
+          <span class="stat-label">Community Rep</span>
+        </div>
+      </div>
+      <p class="caption">These metrics will appear once you start completing quests.</p>
+    </div>
+
+    <!-- Community Badges -->
+    <div class="profile-card glass-card" style="margin-top: var(--space-md);">
+      <h3>Community Badges</h3>
+      <div class="badges-placeholder" id="badges-container">
+        <span class="badge badge--verified">Verified Member</span>
+        <span class="badge badge--new">Founding Member</span>
+        <!-- Additional placeholder badges -->
+      </div>
+      <p class="caption">Badges are earned through participation and trust.</p>
+    </div>
+
+    <!-- Quest Statistics (Placeholder) -->
+    <div class="profile-card glass-card" style="margin-top: var(--space-md);">
+      <h3>Quest Statistics</h3>
+      <div class="placeholder-stats">
+        <div class="placeholder-stat">
+          <span class="stat-value">—</span>
+          <span class="stat-label">Quests Completed</span>
+        </div>
+        <div class="placeholder-stat">
+          <span class="stat-value">—</span>
+          <span class="stat-label">People Helped</span>
+        </div>
+        <div class="placeholder-stat">
+          <span class="stat-value">—</span>
+          <span class="stat-label">Hours Contributed</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Verification Status -->
+    <div class="profile-card glass-card" style="margin-top: var(--space-md);">
+      <h3>Verification Status</h3>
+      <p id="verification-status-text" class="text-muted">Loading…</p>
+      <div style="display:flex; gap: var(--space-xs); flex-wrap: wrap; margin-top: var(--space-xs);">
+        <a href="verification-request.html" class="btn btn--secondary">Request Verification</a>
+        <a href="identity-journey.html" class="btn btn--secondary">How Trust Works</a>
+      </div>
+    </div>
+
+    <p id="profile-error" class="validation-message error hidden" style="margin-top: var(--space-sm);"></p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="profile.js"></script>
+  <script>
+    if (!isConfigured) window.location.href = 'index.html';
+
+    async function loadProfile() {
+      try {
+        const user = await getCurrentUser();
+        if (!user) { window.location.href = 'login.html'; return; }
+
+        const profile = await getOrCreateProfile(user);
+
+        // Basic info
+        document.getElementById('display-name').textContent = profile.display_name || user.email;
+        document.getElementById('user-email').textContent = user.email;
+        document.getElementById('avatar').textContent = (profile.display_name || user.email)[0].toUpperCase();
+
+        // Bio
+        document.getElementById('profile-bio').textContent = profile.bio || 'No bio yet.';
+
+        // City
+        document.getElementById('profile-city').textContent = profile.city || 'Not set';
+
+        // Languages, Skills, Interests – join arrays
+        const formatList = (arr) => arr && arr.length ? arr.join(', ') : 'Not set';
+        document.getElementById('profile-languages').textContent = formatList(profile.languages);
+        document.getElementById('profile-skills').textContent = formatList(profile.skills);
+        document.getElementById('profile-interests').textContent = formatList(profile.interests);
+
+        // Availability
+        document.getElementById('profile-availability').textContent = profile.availability || 'Not set';
+
+        // Verification status
+        const vStatusMap = {
+          'not_submitted': 'Not submitted',
+          'pending': 'Pending review',
+          'approved': 'Approved',
+          'rejected': 'Rejected'
+        };
+        document.getElementById('verification-status-text').textContent =
+          vStatusMap[profile.verification_status] || profile.verification_status;
+
+        // Profile completion
+        const fields = [
+          profile.display_name,
+          profile.bio,
+          profile.city,
+          profile.languages?.length,
+          profile.skills?.length,
+          profile.interests?.length,
+          profile.avatar_url
+        ];
+        const filled = fields.filter(f => !!f).length;
+        const percent = Math.round((filled / fields.length) * 100);
+        document.getElementById('completion-bar').style.width = percent + '%';
+        document.getElementById('completion-text').textContent = percent + '% complete';
+
+        // Badges placeholder (static for now)
+        // Already in HTML
+
+      } catch (err) {
+        document.getElementById('profile-error').textContent = 'Failed to load profile.';
+        document.getElementById('profile-error').classList.remove('hidden');
+      }
+    }
+
+    loadProfile();
+  </script>
+</body>
+</html>

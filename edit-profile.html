@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit Profile – Impact Quest</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0a0e27">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="auth-page">
+  <main class="auth-container" style="max-width: 600px;">
+    <div class="auth-card glass-card">
+      <a href="profile.html" class="auth-back">← Back to Profile</a>
+      <h1 class="section__title">Edit Profile</h1>
+      <p class="subtitle">Share a little about yourself so your community can connect with you.</p>
+
+      <form id="edit-form" class="auth-form">
+        <div class="input-group">
+          <label>Profile Photo</label>
+          <input type="file" id="avatar-file" accept="image/*" style="color: var(--color-text-muted);">
+          <p class="caption">Photo upload will be enabled soon. For now, you can select an image to preview.</p>
+          <div id="avatar-preview" style="margin-top: var(--space-xs);"></div>
+        </div>
+        <div class="input-group">
+          <label for="displayName">Display Name</label>
+          <input type="text" id="displayName" class="input" required>
+        </div>
+        <div class="input-group">
+          <label for="bio">Short Bio</label>
+          <textarea id="bio" class="textarea" rows="3" placeholder="Tell your community a little about yourself..."></textarea>
+        </div>
+        <div class="input-group">
+          <label for="city">City / Municipality</label>
+          <input type="text" id="city" class="input" placeholder="e.g., Manila, Cebu">
+        </div>
+        <div class="input-group">
+          <label for="languages">Languages (comma-separated)</label>
+          <input type="text" id="languages" class="input" placeholder="Tagalog, English, Cebuano">
+        </div>
+        <div class="input-group">
+          <label for="skills">Skills (comma-separated)</label>
+          <input type="text" id="skills" class="input" placeholder="Cooking, Tutoring, Driving">
+        </div>
+        <div class="input-group">
+          <label for="interests">Interests (comma-separated)</label>
+          <input type="text" id="interests" class="input" placeholder="Environment, Education, Animal Welfare">
+        </div>
+        <div class="input-group">
+          <label for="availability">Availability</label>
+          <input type="text" id="availability" class="input" placeholder="Weekends, Evenings">
+        </div>
+        <button type="submit" class="btn btn--primary">Save Changes</button>
+        <p id="edit-error" class="validation-message error hidden"></p>
+        <p id="edit-success" class="validation-message success hidden"></p>
+      </form>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="profile.js"></script>
+  <script>
+    if (!isConfigured) window.location.href = 'index.html';
+
+    const form = document.getElementById('edit-form');
+    const errEl = document.getElementById('edit-error');
+    const okEl  = document.getElementById('edit-success');
+    let currentUserId = null;
+
+    // Load existing profile data
+    async function loadProfileData() {
+      try {
+        const user = await getCurrentUser();
+        if (!user) { window.location.href = 'login.html'; return; }
+        currentUserId = user.id;
+        const profile = await getOrCreateProfile(user);
+
+        document.getElementById('displayName').value = profile.display_name || '';
+        document.getElementById('bio').value = profile.bio || '';
+        document.getElementById('city').value = profile.city || '';
+        document.getElementById('languages').value = (profile.languages || []).join(', ');
+        document.getElementById('skills').value = (profile.skills || []).join(', ');
+        document.getElementById('interests').value = (profile.interests || []).join(', ');
+        document.getElementById('availability').value = profile.availability || '';
+
+        // Avatar preview if exists
+        if (profile.avatar_url) {
+          document.getElementById('avatar-preview').innerHTML = `<img src="${profile.avatar_url}" alt="Avatar" style="width:80px;height:80px;border-radius:50%;object-fit:cover;">`;
+        }
+      } catch (err) {
+        errEl.textContent = 'Failed to load profile.';
+        errEl.classList.remove('hidden');
+      }
+    }
+
+    // Avatar file input preview
+    document.getElementById('avatar-file').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const preview = document.getElementById('avatar-preview');
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        preview.innerHTML = `<img src="${ev.target.result}" alt="Preview" style="width:80px;height:80px;border-radius:50%;object-fit:cover;">`;
+      };
+      reader.readAsDataURL(file);
+      // In future, upload to Supabase Storage and save URL
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errEl.classList.add('hidden');
+      okEl.classList.add('hidden');
+
+      const updates = {
+        display_name: document.getElementById('displayName').value,
+        bio: document.getElementById('bio').value,
+        city: document.getElementById('city').value,
+        languages: document.getElementById('languages').value.split(',').map(s => s.trim()).filter(Boolean),
+        skills: document.getElementById('skills').value.split(',').map(s => s.trim()).filter(Boolean),
+        interests: document.getElementById('interests').value.split(',').map(s => s.trim()).filter(Boolean),
+        availability: document.getElementById('availability').value,
+        updated_at: new Date().toISOString()
+      };
+
+      try {
+        const { data, error } = await updateProfile(currentUserId, updates);
+        if (error) throw error;
+        okEl.textContent = 'Profile updated successfully!';
+        okEl.classList.remove('hidden');
+        setTimeout(() => { window.location.href = 'profile.html'; }, 1500);
+      } catch (err) {
+        errEl.textContent = err.message || 'Update failed.';
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    loadProfileData();
+  </script>
+</body>
+</html>

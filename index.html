@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Impact Quest – Connecting people who want to help with real opportunities to make a difference.">
+  <title>Impact Quest | Changing Lives, One Quest at a Time</title>
+
+  <!-- PWA-ready -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0a0e27">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Skip to main content (accessibility) -->
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <!-- Cinematic Intro Overlay -->
+  <div id="cinematic-intro" class="cinematic-intro" aria-hidden="false">
+    <canvas id="intro-canvas" aria-hidden="true"></canvas>
+    <div class="intro-text-sequence">
+      <p class="intro-message" id="intro-msg-1">Every light represents someone who chose to help.</p>
+      <p class="intro-message" id="intro-msg-2">Together, those actions change the world.</p>
+      <div class="intro-final" id="intro-final">
+        <h1 class="intro-logo">IMPACT QUEST</h1>
+        <p class="intro-tagline">Changing Lives, One Quest at a Time.</p>
+      </div>
+    </div>
+    <button class="skip-intro" id="skip-intro" aria-label="Skip intro">Skip intro →</button>
+  </div>
+
+  <!-- Main Content (initially hidden) -->
+  <main id="main-content" class="main-content" aria-hidden="true">
+    <!-- Hero Section -->
+    <section class="hero section">
+      <div class="container">
+        <h1 class="hero__title">Real People.<br><span class="highlight">Real Impact.</span></h1>
+        <p class="hero__subtitle typewriter" data-text="A trusted community where kindness becomes an adventure. Find help or offer it – every quest changes a life."></p>
+        <div class="hero__ctas">
+          <button class="btn btn--primary" id="start-quest-demo">See a Quest in Action</button>
+          <a href="#mission" class="btn btn--secondary">Learn More</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quest Simulator (Inline demo) -->
+    <section id="quest-demo" class="quest-demo section hidden">
+      <div class="container">
+        <div class="quest-demo__card glass-card">
+          <button class="quest-demo__close" aria-label="Close demo">&times;</button>
+          <div class="quest-demo__steps">
+            <div class="step step--active" data-step="1">
+              <div class="step__icon">🔍</div>
+              <h3>Step 1: Discover a Need</h3>
+              <p>Your neighbour needs groceries. A local park needs cleaning. Real needs, posted by real people.</p>
+            </div>
+            <div class="step" data-step="2">
+              <div class="step__icon">🤝</div>
+              <h3>Step 2: Offer to Help</h3>
+              <p>Accept the quest and connect securely. No algorithms, no popularity contests – just people helping people.</p>
+            </div>
+            <div class="step" data-step="3">
+              <div class="step__icon">✨</div>
+              <h3>Step 3: Make a Difference</h3>
+              <p>Complete the quest, verify the impact, and watch our community dashboard grow. You just changed a life.</p>
+            </div>
+          </div>
+          <div class="quest-demo__progress">
+            <div class="progress-bar">
+              <div class="progress-bar__fill" style="width: 33%"></div>
+            </div>
+          </div>
+          <div class="quest-demo__controls">
+            <button class="btn btn--secondary" id="prev-step" disabled>← Previous</button>
+            <button class="btn btn--primary" id="next-step">Next Step →</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Community Impact Dashboard -->
+    <section class="impact section">
+      <div class="container">
+        <h2 class="section__title">Our Collective Impact</h2>
+        <div class="impact__grid" id="impact-counters">
+          <div class="impact__item glass-card">
+            <span class="impact__icon" aria-hidden="true">❤️</span>
+            <span class="impact__number" data-target="1247">0</span>
+            <span class="impact__label">Lives Helped</span>
+          </div>
+          <div class="impact__item glass-card">
+            <span class="impact__icon" aria-hidden="true">🌳</span>
+            <span class="impact__number" data-target="892">0</span>
+            <span class="impact__label">Trees Planted</span>
+          </div>
+          <div class="impact__item glass-card">
+            <span class="impact__icon" aria-hidden="true">🍱</span>
+            <span class="impact__number" data-target="4560">0</span>
+            <span class="impact__label">Meals Shared</span>
+          </div>
+          <div class="impact__item glass-card">
+            <span class="impact__icon" aria-hidden="true">📚</span>
+            <span class="impact__number" data-target="321">0</span>
+            <span class="impact__label">Children Mentored</span>
+          </div>
+          <div class="impact__item glass-card">
+            <span class="impact__icon" aria-hidden="true">🤝</span>
+            <span class="impact__number" data-target="10450">0</span>
+            <span class="impact__label">Volunteer Hours</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Live Activity Feed -->
+    <section class="activity section">
+      <div class="container">
+        <h2 class="section__title">Recent Kindness</h2>
+        <div class="activity__feed" id="activity-feed">
+          <!-- Feed items dynamically inserted by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Choose Your Journey -->
+    <section class="journey section">
+      <div class="container">
+        <h2 class="section__title">Choose Your Journey</h2>
+        <div class="journey__grid">
+          <div class="journey-card glass-card" data-role="helper">
+            <div class="journey-card__icon" aria-hidden="true">🤲</div>
+            <h3>I want to help</h3>
+            <p>Join quests, lend a hand, and make a real difference in your community.</p>
+            <button class="btn btn--primary journey-cta">Start Helping</button>
+          </div>
+          <div class="journey-card glass-card" data-role="seeker">
+            <div class="journey-card__icon" aria-hidden="true">🫶</div>
+            <h3>I need support</h3>
+            <p>Ask for help, connect with trusted helpers, and find the support you need.</p>
+            <button class="btn btn--primary journey-cta">Ask for Help</button>
+          </div>
+          <div class="journey-card glass-card" data-role="organization">
+            <div class="journey-card__icon" aria-hidden="true">🏢</div>
+            <h3>I represent an organization</h3>
+            <p>Mobilize volunteers, track impact, and strengthen your community partnerships.</p>
+            <button class="btn btn--primary journey-cta">Get Started</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Storytelling: Why Impact Quest Exists -->
+    <section class="story section">
+      <div class="container">
+        <h2 class="section__title">Why Impact Quest Exists</h2>
+        <div class="story__content glass-card">
+          <p>Every community has people willing to help. Every community has people who need help. But too often they never find each other. Impact Quest bridges that gap through trust, verification, and meaningful action. We don't replace human connection – we make it easier to discover.</p>
+          <p>We believe that kindness, when visible and trusted, can transform neighbourhoods, cities, and the world.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Community Impact Map Preview -->
+    <section class="map section">
+      <div class="container">
+        <h2 class="section__title">Impact Around the World</h2>
+        <div class="map__container glass-card" id="impact-map">
+          <!-- SVG world map placeholder with glowing markers -->
+          <svg viewBox="0 0 1000 500" class="world-map" aria-label="World map showing community impact locations">
+            <!-- Stylized continents as simple shapes (kept minimal for performance) -->
+            <path d="M150,200 Q200,150 250,180 Q300,160 350,190 Q380,210 370,250 Q340,300 280,290 Q220,280 180,240 Z" fill="rgba(255,255,255,0.05)"/>
+            <path d="M500,100 Q550,80 600,90 Q650,70 700,100 Q750,130 740,180 Q700,220 630,210 Q560,200 520,160 Z" fill="rgba(255,255,255,0.05)"/>
+            <path d="M750,250 Q800,220 850,240 Q900,270 880,320 Q840,360 780,350 Q740,330 730,280 Z" fill="rgba(255,255,255,0.05)"/>
+            <!-- Glowing markers (placeholder) -->
+            <circle cx="280" cy="210" r="4" class="map-marker" style="animation-delay: 0s"/>
+            <circle cx="580" cy="120" r="4" class="map-marker" style="animation-delay: 0.5s"/>
+            <circle cx="810" cy="280" r="4" class="map-marker" style="animation-delay: 1s"/>
+            <circle cx="350" cy="300" r="4" class="map-marker" style="animation-delay: 1.5s"/>
+            <circle cx="700" cy="180" r="4" class="map-marker" style="animation-delay: 2s"/>
+          </svg>
+          <p class="map__caption">Every dot is a verified act of kindness. Soon, you'll see your own.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Mission Section -->
+    <section id="mission" class="mission section">
+      <div class="container">
+        <h2 class="section__title">Our Mission</h2>
+        <p class="mission__text">Impact Quest is not a task app, not a social network. It’s a trusted community where every act of kindness becomes a meaningful adventure – connecting those who need help with those who want to help, while building a world where no one faces hardship alone.</p>
+      </div>
+    </section>
+
+    <!-- Why Impact Quest (Three Pillars) -->
+    <section class="pillars section">
+      <div class="container">
+        <h2 class="section__title">Why Impact Quest</h2>
+        <div class="pillars__grid">
+          <div class="pillar-card glass-card tilt-effect">
+            <div class="pillar-card__icon" aria-hidden="true">
+              <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><path d="M24 4L30 16L44 18L32 28L36 42L24 34L12 42L16 28L4 18L18 16L24 4Z" fill="url(#gold)"/></svg>
+            </div>
+            <h3 class="pillar-card__title">Help Someone</h3>
+            <p class="pillar-card__text">Every quest is a real chance to improve a life, protect the environment, or support a neighbour. No points for popularity – just genuine impact.</p>
+          </div>
+          <div class="pillar-card glass-card tilt-effect">
+            <div class="pillar-card__icon" aria-hidden="true">
+              <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="16" stroke="url(#gold)" stroke-width="4"/><path d="M24 12V24L32 28" stroke="url(#gold)" stroke-width="4" stroke-linecap="round"/></svg>
+            </div>
+            <h3 class="pillar-card__title">Build Trust</h3>
+            <p class="pillar-card__text">Trust is earned, never bought. Verified identities, peer endorsements, and transparent processes keep everyone safe and respected.</p>
+          </div>
+          <div class="pillar-card glass-card tilt-effect">
+            <div class="pillar-card__icon" aria-hidden="true">
+              <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><circle cx="16" cy="18" r="6" stroke="url(#gold)" stroke-width="4"/><circle cx="32" cy="18" r="6" stroke="url(#gold)" stroke-width="4"/><path d="M8 36C8 30 12 26 16 26H32C36 26 40 30 40 36" stroke="url(#gold)" stroke-width="4" stroke-linecap="round"/></svg>
+            </div>
+            <h3 class="pillar-card__title">Strengthen Communities</h3>
+            <p class="pillar-card__text">When neighbours help neighbours, everyone rises. We measure success by stronger communities, not just user numbers.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Founder Philosophy -->
+    <section class="philosophy section">
+      <div class="container">
+        <blockquote class="philosophy__quote glass-card">
+          <p>“We believe that no one should face life's hardest moments alone. Impact Quest was born from the conviction that help should be easy to find – and even easier to give. Behind every account is a real person, and every quest is a chance to be the light someone needs.”</p>
+        </blockquote>
+        <p class="philosophy__attribution">— The Impact Quest Team</p>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer section">
+      <div class="container">
+        <div class="footer__links">
+          <a href="#" class="footer__link">Privacy</a>
+          <a href="#" class="footer__link">Terms</a>
+          <a href="#" class="footer__link">Community Guidelines</a>
+          <a href="#" class="footer__link">Contact</a>
+        </div>
+        <p class="footer__copy">&copy; 2026 Impact Quest. All rights reserved.</p>
+      </div>
+    </footer>
+  </main>
+
+  <!-- Modal for journey selection placeholder (authentication) -->
+  <div id="auth-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal__content glass-card">
+      <button class="modal__close" aria-label="Close">&times;</button>
+      <h2 id="modal-title">Welcome to Impact Quest</h2>
+      <p>Sign in to start your journey, or create a free account in under a minute.</p>
+      <div class="modal__actions">
+        <a href="login.html" class="btn btn--primary">Sign In</a>
+        <a href="register.html" class="btn btn--secondary">Create Account</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="script.js"></script>
+</body>
+</html>

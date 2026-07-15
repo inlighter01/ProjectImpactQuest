@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Public Profile – Impact Quest</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0a0e27">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="profile-page">
+  <main class="container" style="max-width: 800px; padding-top: var(--space-lg); padding-bottom: var(--space-xl);">
+    <a href="profile.html" class="auth-back">← Back to My Profile</a>
+    <div class="profile-header" style="text-align:center; margin-top: var(--space-sm);">
+      <div class="avatar-placeholder" id="public-avatar">?</div>
+      <h1 id="public-name">Loading…</h1>
+      <p id="public-bio" class="text-muted"></p>
+    </div>
+
+    <div class="profile-card glass-card" style="margin-top: var(--space-md);">
+      <h3>Location</h3>
+      <p id="public-city" class="text-muted">Not set</p>
+    </div>
+
+    <div class="profile-grid">
+      <div class="profile-card glass-card">
+        <h3>Languages</h3>
+        <p id="public-languages" class="text-muted">—</p>
+      </div>
+      <div class="profile-card glass-card">
+        <h3>Skills</h3>
+        <p id="public-skills" class="text-muted">—</p>
+      </div>
+      <div class="profile-card glass-card">
+        <h3>Interests</h3>
+        <p id="public-interests" class="text-muted">—</p>
+      </div>
+      <div class="profile-card glass-card">
+        <h3>Member Since</h3>
+        <p id="public-member-since" class="text-muted">—</p>
+      </div>
+    </div>
+
+    <!-- Badges Public View -->
+    <div class="profile-card glass-card" style="margin-top: var(--space-md);">
+      <h3>Community Badges</h3>
+      <div class="badges-placeholder" id="public-badges">
+        <span class="badge badge--verified">Verified Member</span>
+        <span class="badge badge--new">Founding Member</span>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script src="profile.js"></script>
+  <script>
+    if (!isConfigured) window.location.href = 'index.html';
+
+    async function loadPublicProfile() {
+      try {
+        const user = await getCurrentUser();
+        if (!user) { window.location.href = 'login.html'; return; }
+        const profile = await getOrCreateProfile(user);
+
+        document.getElementById('public-avatar').textContent = (profile.display_name || user.email)[0].toUpperCase();
+        document.getElementById('public-name').textContent = profile.display_name || 'Community Member';
+        document.getElementById('public-bio').textContent = profile.bio || 'No bio yet.';
+        document.getElementById('public-city').textContent = profile.city || 'Not set';
+
+        const format = (arr) => arr && arr.length ? arr.join(', ') : '—';
+        document.getElementById('public-languages').textContent = format(profile.languages);
+        document.getElementById('public-skills').textContent = format(profile.skills);
+        document.getElementById('public-interests').textContent = format(profile.interests);
+
+        document.getElementById('public-member-since').textContent =
+          new Date(user.created_at).toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+
+        // Badges static for now
+        // Future: show earned badges
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    loadPublicProfile();
+  </script>
+</body>
+</html>

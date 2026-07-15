@@ -1,0 +1,14 @@
+
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Create Community Quest</title>
+<link rel="stylesheet" href="style.css"></head><body>
+<header><h1>Create a Community Quest</h1><nav><a href="profile.html">Profile</a> | <a href="my-quests.html">My Quests</a></nav></header>
+<main class="quest-container">
+<form id="questForm">
+<label>Quest Title<input id="title" required></label>
+<label>Category<select id="category"><option>Community Service</option><option>Education</option><option>Medical Assistance</option></select></label>
+<label>Description<textarea id="description"></textarea></label>
+<label>Why this quest matters<textarea id="impact"></textarea></label>
+<button type="button" id="saveDraft">Save Draft</button>
+<button type="button" id="previewBtn">Preview</button>
+<button type="submit">Submit for Review</button>
+</form></main><script src="quest.js"></script></body></html>

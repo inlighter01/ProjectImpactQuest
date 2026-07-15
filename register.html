@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Join Impact Quest</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0a0e27">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="auth-page">
+  <main class="auth-container">
+    <div class="auth-card glass-card">
+      <h1 class="section__title">Join the movement</h1>
+      <p class="subtitle">Create your account and start making a difference.</p>
+
+      <form id="register-form" class="auth-form">
+        <div class="input-group">
+          <label for="displayName">Display Name</label>
+          <input type="text" id="displayName" class="input" placeholder="How should we call you?" required>
+        </div>
+        <div class="input-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" class="input" placeholder="you@example.com" required>
+        </div>
+        <div class="input-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" class="input" placeholder="Create a strong password" required minlength="8">
+          <div class="password-strength">
+            <div class="password-strength__bar" id="strength-bar"></div>
+          </div>
+          <p class="caption">Must be at least 8 characters with uppercase, lowercase, number, and special character.</p>
+        </div>
+        <div class="input-group">
+          <label for="confirmPassword">Confirm Password</label>
+          <input type="password" id="confirmPassword" class="input" placeholder="Re-enter your password" required>
+        </div>
+        <div class="input-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="acceptTerms" required> I accept the <a href="#" target="_blank">Community Guidelines</a> and <a href="#" target="_blank">Privacy Policy</a>
+          </label>
+        </div>
+        <button type="submit" class="btn btn--primary">Create Account</button>
+        <p id="register-error" class="validation-message error hidden"></p>
+        <p id="register-success" class="validation-message success hidden"></p>
+      </form>
+      <div class="auth-footer">
+        Already have an account? <a href="login.html">Sign in</a>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script>
+    // Password strength indicator
+    const passwordInput = document.getElementById('password');
+    const strengthBar = document.getElementById('strength-bar');
+
+    passwordInput.addEventListener('input', () => {
+      const val = passwordInput.value;
+      let strength = 0;
+      if (val.length >= 8) strength++;
+      if (/[A-Z]/.test(val)) strength++;
+      if (/[0-9]/.test(val)) strength++;
+      if (/[^A-Za-z0-9]/.test(val)) strength++;
+
+      strengthBar.className = 'password-strength__bar';
+      if (strength === 0) strengthBar.classList.add('strength-weak');
+      else if (strength === 1) strengthBar.classList.add('strength-weak');
+      else if (strength === 2) strengthBar.classList.add('strength-fair');
+      else if (strength === 3) strengthBar.classList.add('strength-good');
+      else strengthBar.classList.add('strength-strong');
+    });
+
+    // Registration form
+    const form = document.getElementById('register-form');
+    const errorEl = document.getElementById('register-error');
+    const successEl = document.getElementById('register-success');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorEl.classList.add('hidden');
+      successEl.classList.add('hidden');
+
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+      const displayName = document.getElementById('displayName').value;
+
+      if (password !== confirmPassword) {
+        errorEl.textContent = 'Passwords do not match.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      const { data, error } = await registerUser(email, password, displayName);
+      if (error) {
+        errorEl.textContent = error.message || 'Registration failed. Please try again.';
+        errorEl.classList.remove('hidden');
+      } else {
+        // Create the matching profile row (v0.5.0 Community Identity System).
+        // If this fails, registration still succeeded — profile.js will
+        // create the profile automatically on the user's first visit.
+        if (data?.user) {
+          try {
+            await supabase.from('profiles').insert({
+              user_id: data.user.id,
+              display_name: displayName,
+            });
+          } catch (profileErr) {
+            console.warn('Profile creation deferred:', profileErr);
+          }
+        }
+
+        successEl.textContent = 'Account created! Check your email to verify your address.';
+        successEl.classList.remove('hidden');
+        form.reset();
+        strengthBar.className = 'password-strength__bar';
+        // Optional: redirect to verification hint page after a delay
+      }
+    });
+  </script>
+</body>
+</html>

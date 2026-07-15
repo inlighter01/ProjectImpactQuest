@@ -1,0 +1,10 @@
+{
+  "name": "Impact Quest",
+  "short_name": "ImpactQuest",
+  "description": "Changing Lives, One Quest at a Time.",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#0a0e27",
+  "theme_color": "#0a0e27",
+  "icons": []
+}
