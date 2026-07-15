@@ -1,0 +1,14 @@
+Impact Quest v0.11.0A
+
+Project extracted successfully.
+
+Next engineering stage:
+- Impact Points schema
+- Quest completion rewards
+- Duplicate reward protection
+- SQL migration
+- Supabase RLS
+- Documentation updates
+
+This archive is only an extracted baseline because the full application
+must be inspected before code can be safely modified.
