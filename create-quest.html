@@ -1,14 +1,18 @@
-
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>Create Community Quest</title>
-<link rel="stylesheet" href="style.css"></head><body>
-<header><h1>Create a Community Quest</h1><nav><a href="profile.html">Profile</a> | <a href="my-quests.html">My Quests</a></nav></header>
-<main class="quest-container">
-<form id="questForm">
-<label>Quest Title<input id="title" required></label>
-<label>Category<select id="category"><option>Community Service</option><option>Education</option><option>Medical Assistance</option></select></label>
-<label>Description<textarea id="description"></textarea></label>
-<label>Why this quest matters<textarea id="impact"></textarea></label>
-<button type="button" id="saveDraft">Save Draft</button>
-<button type="button" id="previewBtn">Preview</button>
-<button type="submit">Submit for Review</button>
-</form></main><script src="quest.js"></script></body></html>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Create a Community Quest · Impact Quest</title><link rel="stylesheet" href="style.css"></head>
+<body><main class="quest-container"><a class="auth-back" href="my-quests.html">← My Quests</a><header class="page-header"><p class="eyebrow">Community Quest Creator</p><h1>Turn a need into a meaningful quest.</h1><p>All submitted quests are reviewed before they appear publicly.</p></header>
+<p id="questMessage" class="quest-message" hidden aria-live="polite"></p>
+<form id="questForm" class="quest-form">
+<label>Quest title <span aria-hidden="true">*</span><input id="title" maxlength="120" required placeholder="e.g., Saturday neighborhood cleanup"></label>
+<label>Category <span aria-hidden="true">*</span><select id="category" required><option value="">Choose a category</option><option>Community Service</option><option>Education</option><option>Medical Assistance</option><option>Environment</option><option>Animal Welfare</option><option>Food Assistance</option><option>Transportation</option><option>Elderly Support</option><option>Youth Programs</option></select></label>
+<label>Describe the quest <span aria-hidden="true">*</span><textarea id="description" maxlength="2000" required placeholder="What needs to be done? What should volunteers expect?"></textarea></label>
+<label>Why does this matter? <span aria-hidden="true">*</span><textarea id="whyItMatters" maxlength="800" required placeholder="Help people understand the positive change this quest will create."></textarea></label>
+<div class="form-grid"><label>City <span aria-hidden="true">*</span><input id="city" required></label><label>Barangay <span aria-hidden="true">*</span><input id="barangay" required></label></div>
+<label>Meeting point <span class="optional">Optional</span><input id="meetingPoint"></label>
+<div class="form-grid"><label>Date <input id="questDate" type="date"></label><label>Time <input id="questTime" type="time"></label></div>
+<div class="form-grid"><label>Estimated duration <input id="duration" placeholder="e.g., 2 hours"></label><label>Volunteer limit <input id="volunteerLimit" type="number" min="1" value="1"></label></div>
+<label>How will completion be verified? <span aria-hidden="true">*</span><select id="verificationMethod" required><option value="">Choose a method</option><option>Photo evidence</option><option>Moderator review</option><option>Organization confirmation</option><option>Location check</option></select></label>
+<label>Safety notes <span class="optional">Optional</span><textarea id="safetyNotes" maxlength="800" placeholder="Mention anything volunteers should know to stay safe."></textarea></label>
+<label class="check-row"><input id="guidelines" type="checkbox" required> I confirm this quest is truthful, safe, non-discriminatory, and follows the Community Guidelines.</label>
+<div class="form-actions"><button id="saveDraft" class="btn btn-secondary" type="button">Save Draft</button><button id="previewBtn" class="btn btn-outline" type="button">Preview</button><button id="submitQuest" class="btn btn-primary" type="submit">Submit for Review</button></div>
+</form></main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="auth.js"></script><script src="quest.js"></script></body></html>
