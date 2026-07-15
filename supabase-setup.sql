@@ -26,6 +26,15 @@ create table if not exists public.quests (
   created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
 
+-- Drafts may be incomplete. Submitted quests must include meaningful details.
+-- These ALTER statements also repair databases created by the first v0.9.6 script.
+alter table public.quests drop constraint if exists quests_description_check;
+alter table public.quests drop constraint if exists quests_why_it_matters_check;
+alter table public.quests add constraint quests_description_check
+  check (status = 'draft' or char_length(description) between 10 and 2000);
+alter table public.quests add constraint quests_why_it_matters_check
+  check (status = 'draft' or char_length(why_it_matters) between 10 and 800);
+
 create table if not exists public.quest_participants (
   id uuid primary key default gen_random_uuid(), quest_id uuid references public.quests(id) on delete cascade not null,
   user_id uuid references auth.users(id) on delete cascade not null,
@@ -43,6 +52,13 @@ alter table public.quests enable row level security;
 alter table public.quest_participants enable row level security;
 alter table public.quest_bookmarks enable row level security;
 
+-- v0.9.7: assigned moderators can review submitted quests.
+alter table public.profiles add column if not exists role text not null default 'member'
+  check (role in ('member', 'moderator', 'admin'));
+alter table public.quests add column if not exists review_notes text;
+alter table public.quests add column if not exists reviewed_by uuid references auth.users(id);
+alter table public.quests add column if not exists reviewed_at timestamptz;
+
 drop policy if exists "Users can view own profile" on public.profiles;
 drop policy if exists "Users can update own profile" on public.profiles;
 drop policy if exists "Users can insert own profile" on public.profiles;
@@ -59,6 +75,17 @@ create policy "Creators can read own quests" on public.quests for select using (
 create policy "Members can create own quests" on public.quests for insert with check (auth.uid() = creator_id);
 create policy "Creators can update drafts" on public.quests for update using (auth.uid() = creator_id and status in ('draft','needs_changes')) with check (auth.uid() = creator_id);
 
+drop policy if exists "Moderators can view review queue" on public.quests;
+drop policy if exists "Moderators can update review queue" on public.quests;
+create policy "Moderators can view review queue" on public.quests for select
+using (exists (select 1 from public.profiles p where p.user_id = auth.uid() and p.role in ('moderator','admin')));
+create policy "Moderators can update review queue" on public.quests for update
+using (exists (select 1 from public.profiles p where p.user_id = auth.uid() and p.role in ('moderator','admin')))
+with check (exists (select 1 from public.profiles p where p.user_id = auth.uid() and p.role in ('moderator','admin')));
+
+drop policy if exists "Members can read their participation" on public.quest_participants;
+drop policy if exists "Members can join once" on public.quest_participants;
+drop policy if exists "Members can manage own bookmarks" on public.quest_bookmarks;
 create policy "Members can read their participation" on public.quest_participants for select using (auth.uid() = user_id);
 create policy "Members can join once" on public.quest_participants for insert with check (auth.uid() = user_id);
 create policy "Members can manage own bookmarks" on public.quest_bookmarks for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
