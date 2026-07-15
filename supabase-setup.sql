@@ -503,3 +503,100 @@ begin
   return v_sent;
 end;
 $$;
+
+-- ============================================================
+-- Impact Quest v0.10.1 — HOTFIX: infinite recursion in RLS policies
+-- ============================================================
+-- v0.10.0 added policies where quests' policy reads quest_participants,
+-- and quest_participants' policy reads quests (and similarly profiles
+-- <-> quests). Postgres evaluates a policy's subquery under that target
+-- table's own RLS, so checking policy A re-triggers policy B, which
+-- re-triggers policy A — "infinite recursion detected in policy for
+-- relation quest_participants". This showed up on Save Profile because
+-- profile.js calls .select() after .update(), which forces Postgres to
+-- re-check every SELECT policy on profiles, including the recursive ones.
+--
+-- Fix: move every cross-table check into a small SECURITY DEFINER
+-- function. Such functions run as the table owner, and the owner
+-- bypasses RLS on their own tables by default — so the lookup inside
+-- the function does NOT re-trigger policy evaluation, breaking the
+-- cycle. This is idempotent and safe to run even if v0.10.0's policies
+-- were never applied.
+
+create or replace function public.quest_creator(p_quest_id uuid)
+returns uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select creator_id from public.quests where id = p_quest_id;
+$$;
+
+create or replace function public.is_quest_participant(p_quest_id uuid, p_user_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.quest_participants
+    where quest_id = p_quest_id and user_id = p_user_id
+  );
+$$;
+
+create or replace function public.user_role(p_user_id uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select role from public.profiles where user_id = p_user_id;
+$$;
+
+-- ---------- quests: replace recursive policies with function-based ones ----------
+drop policy if exists "Moderators can view review queue" on public.quests;
+drop policy if exists "Moderators can update review queue" on public.quests;
+create policy "Moderators can view review queue" on public.quests for select
+using (public.user_role(auth.uid()) in ('moderator', 'admin'));
+create policy "Moderators can update review queue" on public.quests for update
+using (public.user_role(auth.uid()) in ('moderator', 'admin'))
+with check (public.user_role(auth.uid()) in ('moderator', 'admin'));
+
+drop policy if exists "Participants can read their joined quests" on public.quests;
+create policy "Participants can read their joined quests" on public.quests for select
+using (public.is_quest_participant(id, auth.uid()));
+
+-- ---------- quest_participants: replace recursive policy ----------
+drop policy if exists "Creators can view their quest participants" on public.quest_participants;
+create policy "Creators can view their quest participants" on public.quest_participants for select
+using (public.quest_creator(quest_id) = auth.uid());
+
+-- ---------- profiles: replace recursive policies ----------
+drop policy if exists "Anyone can view an approved quest's organizer profile" on public.profiles;
+drop policy if exists "Organizers can view their participants' profiles" on public.profiles;
+create policy "Anyone can view an approved quest's organizer profile" on public.profiles for select
+using (
+  exists (
+    select 1 from public.quests q
+    where q.creator_id = profiles.user_id and q.status = 'approved'
+  )
+);
+create policy "Organizers can view their participants' profiles" on public.profiles for select
+using (
+  exists (
+    select 1 from public.quest_participants qp
+    where qp.user_id = profiles.user_id
+      and public.quest_creator(qp.quest_id) = auth.uid()
+  )
+);
+
+-- ---------- quest_activity: replace recursive policy ----------
+drop policy if exists "Participants and creators can read quest activity" on public.quest_activity;
+create policy "Participants and creators can read quest activity" on public.quest_activity for select
+using (
+  public.quest_creator(quest_activity.quest_id) = auth.uid()
+  or public.is_quest_participant(quest_activity.quest_id, auth.uid())
+);
