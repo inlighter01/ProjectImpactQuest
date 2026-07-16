@@ -118,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
       draw() {
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255,215,0,${this.opacity})`;
+        ctx.fillStyle = `rgba(201,162,39,${this.opacity})`;
         ctx.fill();
       }
     }
@@ -138,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
-            ctx.strokeStyle = `rgba(255,215,0,${0.15 * (1 - dist / connectionDistance)})`;
+            ctx.strokeStyle = `rgba(201,162,39,${0.15 * (1 - dist / connectionDistance)})`;
             ctx.lineWidth = 0.5;
             ctx.stroke();
           }

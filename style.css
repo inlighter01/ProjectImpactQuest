@@ -1845,3 +1845,76 @@ h3, .h3 {
   .quest-detail-grid { grid-template-columns: 1fr; }
   .quest-sidebar { position: static; }
 }
+
+/* ============================================================
+   v0.11.2 — Animation Layer & Guide Character
+   Powered by animations.js. Respects prefers-reduced-motion via
+   the global rule above (JS-driven motion additionally checks
+   matchMedia itself, since that global rule can't stop rAF loops).
+   ============================================================ */
+
+/* ---------- Scroll reveal ---------- */
+.reveal { opacity: 0; transform: translateY(28px); transition: opacity .7s ease, transform .7s ease; }
+.reveal-visible { opacity: 1; transform: translateY(0); }
+
+/* ---------- Tilt effect (mouse-tracked 3D tilt) ---------- */
+.tilt-effect { transition: transform .25s ease; transform-style: preserve-3d; will-change: transform; }
+
+/* ---------- Ambient ember field (opt-in via #ember-field container) ---------- */
+#ember-field { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: -1; }
+#ember-field canvas { display: block; width: 100%; height: 100%; }
+
+/* ---------- Hero Guide Character ---------- */
+.hero__guide { display: flex; flex-direction: column; align-items: center; gap: .9rem; margin-bottom: var(--space-md); }
+
+.guide-avatar { width: 148px; height: 148px; animation: guideFloat 5s ease-in-out infinite; }
+.guide-avatar svg { width: 100%; height: 100%; overflow: visible; }
+
+.guide-halo { animation: guideHaloPulse 4s ease-in-out infinite; transform-origin: 100px 100px; }
+.guide-ring { animation: guideRingSpin 22s linear infinite; transform-origin: 100px 100px; }
+.guide-eyelid-l, .guide-eyelid-r { animation: guideBlink 6s ease-in-out infinite; transform-origin: center; }
+.guide-eyelid-r { animation-delay: 0.02s; }
+.guide-sparkle { animation: guideSparkle 2.4s ease-in-out infinite; }
+.guide-sparkle:nth-child(2) { animation-delay: .5s; }
+.guide-sparkle:nth-child(3) { animation-delay: 1.1s; }
+.guide-sparkle:nth-child(4) { animation-delay: 1.7s; }
+
+.guide-speech {
+  max-width: 320px;
+  padding: .7rem 1.1rem;
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  font-size: .92rem;
+  color: var(--color-text-muted);
+  text-align: center;
+  animation: fadeSlideIn 1s ease 0.3s both;
+}
+
+@keyframes guideFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes guideHaloPulse {
+  0%, 100% { opacity: .55; transform: scale(1); }
+  50% { opacity: .85; transform: scale(1.06); }
+}
+@keyframes guideRingSpin {
+  to { transform: rotate(360deg); }
+}
+@keyframes guideBlink {
+  0%, 92%, 100% { transform: scaleY(0.05); opacity: 0; }
+  94%, 98% { transform: scaleY(1); opacity: 1; }
+}
+@keyframes guideSparkle {
+  0%, 100% { opacity: 0; transform: scale(.6); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-avatar, .guide-halo, .guide-ring, .guide-eyelid-l, .guide-eyelid-r, .guide-sparkle {
+    animation: none !important;
+  }
+}

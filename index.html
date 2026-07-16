@@ -48,7 +48,75 @@
   <main id="main-content" class="main-content" aria-hidden="true">
     <!-- Hero Section -->
     <section class="hero section">
+      <div id="ember-field" aria-hidden="true"></div>
       <div class="container">
+        <div class="hero__guide">
+          <div class="guide-avatar" role="img" aria-label="Ember, your Impact Quest guide, smiling and waving">
+            <svg viewBox="0 0 200 210" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <radialGradient id="guideHaloGrad" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#E8C55A" stop-opacity="0.55"/>
+                  <stop offset="100%" stop-color="#A83240" stop-opacity="0"/>
+                </radialGradient>
+                <linearGradient id="guideHairGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#3B2A20"/>
+                  <stop offset="100%" stop-color="#241a13"/>
+                </linearGradient>
+              </defs>
+
+              <circle class="guide-halo" cx="100" cy="100" r="92" fill="url(#guideHaloGrad)"/>
+              <circle class="guide-ring" cx="100" cy="100" r="86" fill="none" stroke="#C9A227" stroke-width="1.5" stroke-dasharray="4 10" opacity="0.6"/>
+
+              <circle class="guide-sparkle" cx="34" cy="60" r="2.5" fill="#E8C55A"/>
+              <circle class="guide-sparkle" cx="168" cy="80" r="2" fill="#E8C55A"/>
+              <circle class="guide-sparkle" cx="26" cy="140" r="2" fill="#E8C55A"/>
+              <circle class="guide-sparkle" cx="172" cy="150" r="2.5" fill="#E8C55A"/>
+
+              <!-- shoulders / clothing -->
+              <path d="M40 210C40 168 66 150 100 150C134 150 160 168 160 210Z" fill="#5C1E2A"/>
+              <path d="M40 210C46 178 68 160 100 160" stroke="#8C6239" stroke-width="2" fill="none" opacity="0.6"/>
+              <path d="M160 210C154 178 132 160 100 160" stroke="#8C6239" stroke-width="2" fill="none" opacity="0.6"/>
+
+              <!-- neck -->
+              <rect x="88" y="118" width="24" height="30" rx="10" fill="#C98A5E"/>
+
+              <!-- hair back -->
+              <path d="M100 40C68 40 54 68 56 100C57 122 62 140 70 152C64 128 64 108 70 96C76 84 88 78 100 78C112 78 124 84 130 96C136 108 136 128 130 152C138 140 143 122 144 100C146 68 132 40 100 40Z" fill="url(#guideHairGrad)"/>
+
+              <!-- head -->
+              <ellipse cx="100" cy="96" rx="38" ry="42" fill="#D99B6E"/>
+
+              <!-- blush -->
+              <ellipse cx="76" cy="108" rx="8" ry="5" fill="#A83240" opacity="0.18"/>
+              <ellipse cx="124" cy="108" rx="8" ry="5" fill="#A83240" opacity="0.18"/>
+
+              <!-- eyebrows -->
+              <path d="M70 82C76 77 86 77 92 81" stroke="#3B2A20" stroke-width="3" stroke-linecap="round" fill="none"/>
+              <path d="M108 81C114 77 124 77 130 82" stroke="#3B2A20" stroke-width="3" stroke-linecap="round" fill="none"/>
+
+              <!-- eyes (whites + iris) -->
+              <ellipse cx="80" cy="94" rx="9" ry="7" fill="#EDE6D6"/>
+              <ellipse cx="120" cy="94" rx="9" ry="7" fill="#EDE6D6"/>
+              <circle cx="81" cy="95" r="4" fill="#8C6239"/>
+              <circle cx="121" cy="95" r="4" fill="#8C6239"/>
+              <circle cx="81" cy="95" r="1.6" fill="#15120E"/>
+              <circle cx="121" cy="95" r="1.6" fill="#15120E"/>
+
+              <!-- blinking eyelids -->
+              <ellipse class="guide-eyelid-l" cx="80" cy="94" rx="9.5" ry="7.5" fill="#D99B6E"/>
+              <ellipse class="guide-eyelid-r" cx="120" cy="94" rx="9.5" ry="7.5" fill="#D99B6E"/>
+
+              <!-- nose + smile -->
+              <path d="M100 98L98 108C98 111 102 111 102 108" stroke="#B87B4F" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+              <path d="M84 118C90 126 110 126 116 118" stroke="#7A1F2B" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+
+              <!-- hair front / bangs with gold streak -->
+              <path d="M62 66C68 48 84 38 100 38C116 38 132 48 138 66C130 56 116 50 100 50C84 50 70 56 62 66Z" fill="url(#guideHairGrad)"/>
+              <path d="M96 40C90 46 86 56 88 66" stroke="#C9A227" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.85"/>
+            </svg>
+          </div>
+          <p class="guide-speech">Hi, I'm Ember — your guide. Ready to turn kindness into your next quest?</p>
+        </div>
         <h1 class="hero__title">Real People.<br><span class="highlight">Real Impact.</span></h1>
         <p class="hero__subtitle typewriter" data-text="A trusted community where kindness becomes an adventure. Find help or offer it – every quest changes a life."></p>
         <div class="hero__ctas">
@@ -275,5 +343,6 @@
 
   <!-- Scripts -->
   <script src="script.js"></script>
+  <script src="animations.js"></script>
 </body>
 </html>
