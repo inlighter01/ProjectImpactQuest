@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Public Profile – Impact Quest</title>
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0a0e27">
+  <meta name="theme-color" content="#0B0A08">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -47,9 +47,9 @@
     <!-- Badges Public View -->
     <div class="profile-card glass-card" style="margin-top: var(--space-md);">
       <h3>Community Badges</h3>
+      <p id="public-level" class="text-muted" style="margin-bottom:var(--space-xs)"></p>
       <div class="badges-placeholder" id="public-badges">
-        <span class="badge badge--verified">Verified Member</span>
-        <span class="badge badge--new">Founding Member</span>
+        <p class="caption">Loading badges…</p>
       </div>
     </div>
   </main>
@@ -58,6 +58,7 @@
   <script src="config.js"></script>
   <script src="auth.js"></script>
   <script src="profile.js"></script>
+  <script src="completion.js"></script>
   <script>
     if (!isConfigured) window.location.href = 'index.html';
 
@@ -80,8 +81,20 @@
         document.getElementById('public-member-since').textContent =
           new Date(user.created_at).toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
 
-        // Badges static for now
-        // Future: show earned badges
+        // Real level + earned badges (v0.11.0) — this is what other members see.
+        const C = window.IQCompletion;
+        const [{ data: levels }, { data: allBadges }, { data: earned }] = await Promise.all([
+          C.loadXpLevels(), C.loadAllBadges(), C.loadEarnedBadges(profile.id),
+        ]);
+        if (levels && levels.length) {
+          const progress = C.levelProgress(levels, profile.xp || 0, profile.level || 1);
+          document.getElementById('public-level').textContent = `Level ${profile.level || 1} · ${progress.title}`;
+        }
+        const earnedCodes = new Set((earned || []).map((e) => e.badges?.code));
+        const earnedBadges = (allBadges || []).filter((b) => earnedCodes.has(b.code));
+        document.getElementById('public-badges').innerHTML = earnedBadges.length
+          ? earnedBadges.map((b) => `<span class="badge badge--featured" title="${b.description}">${b.icon} ${b.name}</span>`).join(' ')
+          : '<p class="caption">No badges earned yet.</p>';
       } catch (err) {
         console.error(err);
       }

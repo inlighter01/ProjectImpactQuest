@@ -1,1 +1,121 @@
-<html><body><h1>Completion Review</h1></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review Completions · Impact Quest</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0B0A08">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="quest-container">
+  <a class="auth-back" id="backLink" href="my-quests.html">← My Quests</a>
+  <header class="page-header">
+    <p class="eyebrow">Organizer Tools</p>
+    <h1 id="pageTitle">Review Completions</h1>
+    <p>Confirm who actually showed up. Confirming attendance awards XP, Impact Points, and Trust Score; a no-show applies a small Trust Score penalty.</p>
+  </header>
+
+  <p id="msg" class="quest-message" hidden aria-live="polite"></p>
+
+  <div id="list" class="quest-list"></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="participation.js"></script>
+<script src="completion.js"></script>
+<script>
+(function () {
+  "use strict";
+  const P = window.IQParticipation;
+  const C = window.IQCompletion;
+  const safe = C.safe;
+  const questId = new URLSearchParams(location.search).get("id");
+  const listEl = document.getElementById("list");
+  const msgEl = document.getElementById("msg");
+
+  function say(text, type = "error") {
+    msgEl.textContent = text;
+    msgEl.className = `quest-message ${type}`;
+    msgEl.hidden = false;
+  }
+
+  function statusLabel(status) {
+    return { pending: "Awaiting your review", present: "Confirmed present", no_show: "Recorded as no-show" }[status] || status;
+  }
+
+  function row(a) {
+    const p = a.profiles || {};
+    const initial = (p.display_name || "?")[0].toUpperCase();
+    const decided = a.status !== "pending";
+    return `<article class="quest-card" data-user="${safe(a.user_id)}">
+      <div class="participant-row">
+        <div class="avatar-sm">${safe(initial)}</div>
+        <div class="participant-info">
+          <div class="participant-name">${safe(p.display_name || "Community member")}</div>
+          <div class="participant-meta">${P.formatTrust ? P.formatTrust(p.trust_score) : "Trust " + Number(p.trust_score || 0).toFixed(1)} <span>Submitted ${C.timeAgo(a.submitted_at)}</span></div>
+        </div>
+      </div>
+      <p>${safe(a.proof_text)}</p>
+      ${a.proof_url ? `<p><a href="${safe(a.proof_url)}" target="_blank" rel="noopener">View submitted proof link</a></p>` : ""}
+      <p class="status-pill ${decided ? (a.status === "present" ? "approved" : "draft") : "submitted"}">${statusLabel(a.status)}</p>
+      ${decided
+        ? (a.review_notes ? `<p class="quest-meta">Note: ${safe(a.review_notes)}</p>` : "")
+        : `<label>Note to volunteer <span class="optional">Optional</span><textarea class="review-notes" maxlength="500" placeholder="Only needed for a no-show."></textarea></label>
+           <div class="form-actions">
+             <button class="btn btn-danger" data-action="no_show">No-show</button>
+             <button class="btn btn-primary" data-action="present">Confirm Present</button>
+           </div>`
+      }
+    </article>`;
+  }
+
+  async function load() {
+    const { data, error } = await C.loadAttendanceForQuest(questId);
+    if (error) { say(error.message); return; }
+    if (!data.length) {
+      listEl.innerHTML = `<section class="empty-state"><h2>No completion submissions yet.</h2><p>Volunteers can submit proof once the quest date has passed.</p></section>`;
+      return;
+    }
+    listEl.innerHTML = data.map(row).join("");
+    listEl.querySelectorAll("[data-action]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const card = btn.closest("[data-user]");
+        const targetUserId = card.dataset.user;
+        const notes = card.querySelector(".review-notes")?.value.trim();
+        card.querySelectorAll("button").forEach((b) => (b.disabled = true));
+        const { error } = await C.decideCompletion(questId, targetUserId, btn.dataset.action, notes);
+        if (error) { say(error.message); card.querySelectorAll("button").forEach((b) => (b.disabled = false)); return; }
+        load();
+      });
+    });
+  }
+
+  async function init() {
+    if (!questId) { say("No quest was specified."); return; }
+    const user = await C.currentUserOrNull();
+    if (!user) { location.href = `login.html?next=${encodeURIComponent(location.pathname + location.search)}`; return; }
+
+    const { data: quest, error } = await P.fetchQuest(questId);
+    if (error || !quest) { say("This quest could not be found."); return; }
+    if (quest.creator_id !== user.id) {
+      document.body.innerHTML = `<main class="quest-container"><section class="empty-state"><h1>Organizer access required</h1><p>Only the organizer of this quest can review completions.</p><a class="btn btn-primary" href="my-quests.html">Back to My Quests</a></section></main>`;
+      return;
+    }
+
+    document.getElementById("backLink").href = `quest-lobby.html?id=${encodeURIComponent(questId)}`;
+    document.getElementById("pageTitle").textContent = `Review Completions — ${quest.title}`;
+    load();
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+})();
+</script>
+</body>
+</html>

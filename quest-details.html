@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quest Details · Impact Quest</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0a0e27">
+<meta name="theme-color" content="#0B0A08">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -53,6 +53,12 @@
           <div class="safety-notice"><p id="qSafety"></p></div>
         </article>
 
+        <article class="quest-card" id="completionCard" hidden>
+          <h2>Quest Completion</h2>
+          <p id="completionText" class="quest-meta"></p>
+          <a class="btn btn-outline" href="#" id="completionLink" style="display:none"></a>
+        </article>
+
         <article class="quest-card" id="organizerParticipantsCard" hidden>
           <div class="page-header-row">
             <h2>Participants</h2>
@@ -96,10 +102,12 @@
 <script src="config.js"></script>
 <script src="auth.js"></script>
 <script src="participation.js"></script>
+<script src="completion.js"></script>
 <script>
 (function () {
   "use strict";
   const P = window.IQParticipation;
+  const C = window.IQCompletion;
   const questId = new URLSearchParams(location.search).get("id");
   const detailEl = document.getElementById("questDetail");
   const msgEl = document.getElementById("questMessage");
@@ -238,6 +246,46 @@
     }
   }
 
+  async function renderCompletionCard(quest) {
+    const card = document.getElementById("completionCard");
+    const text = document.getElementById("completionText");
+    const link = document.getElementById("completionLink");
+    if (!quest.quest_date || new Date(quest.quest_date + "T00:00:00") > new Date()) return; // quest hasn't happened yet
+
+    if (currentUser && currentUser.id === quest.creator_id) {
+      card.hidden = false;
+      text.textContent = "This quest has happened. Review who attended to award XP, Impact Points, and Trust Score.";
+      link.style.display = "";
+      link.textContent = "Review Completions";
+      link.href = `completion-review.html?id=${encodeURIComponent(quest.id)}`;
+      return;
+    }
+
+    if (!currentUser) return;
+    const participation = await P.getMyParticipation(quest.id, currentUser.id);
+    const attendance = await C.getMyAttendance(quest.id, currentUser.id);
+    if (!participation && !attendance) return; // never joined
+
+    card.hidden = false;
+    if (!attendance) {
+      text.textContent = "This quest has happened — submit proof of completion so your organizer can confirm you attended.";
+      link.style.display = "";
+      link.textContent = "Submit Completion";
+      link.href = `submit-completion.html?id=${encodeURIComponent(quest.id)}`;
+    } else if (attendance.status === "pending") {
+      text.textContent = "Your completion submission is awaiting organizer review.";
+      link.style.display = "";
+      link.textContent = "Update Submission";
+      link.href = `submit-completion.html?id=${encodeURIComponent(quest.id)}`;
+    } else if (attendance.status === "present") {
+      text.textContent = "✅ Your organizer confirmed you attended this quest. Check your Profile for the reward.";
+      link.style.display = "none";
+    } else {
+      text.textContent = "Your organizer recorded this as a no-show." + (attendance.review_notes ? ` Note: ${attendance.review_notes}` : "");
+      link.style.display = "none";
+    }
+  }
+
   async function init() {
     if (!questId) { say("No quest was specified."); return; }
     currentUser = await P.currentUserOrNull();
@@ -283,6 +331,8 @@
       document.getElementById("organizerParticipantsCard").hidden = false;
       loadParticipants();
     }
+
+    await renderCompletionCard(quest);
 
     unsubQuest = P.subscribeToQuest(quest.id, (updated) => {
       currentQuest = { ...currentQuest, ...updated };

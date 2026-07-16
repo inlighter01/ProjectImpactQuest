@@ -1,1 +1,116 @@
-<html><body><h1>Submit Completion</h1></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Submit Completion · Impact Quest</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0B0A08">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="quest-container">
+  <a class="auth-back" id="backLink" href="my-quests.html">← My Quests</a>
+  <header class="page-header">
+    <p class="eyebrow">Proof of Impact</p>
+    <h1 id="pageTitle">Submit completion</h1>
+    <p>Tell your organizer what you did. Once they confirm you attended, you'll earn XP, Impact Points, and Trust Score for this quest.</p>
+  </header>
+
+  <p id="msg" class="quest-message" hidden aria-live="polite"></p>
+
+  <div id="alreadyDecided" class="quest-card" hidden>
+    <h2>This quest's completion has already been reviewed</h2>
+    <p id="decidedText" class="quest-meta"></p>
+  </div>
+
+  <form id="completionForm" class="quest-form" hidden>
+    <label>What did you do? <span aria-hidden="true">*</span>
+      <textarea id="proofText" maxlength="1000" required placeholder="e.g., Helped clean up Barangay Del Pilar's basketball court and surrounding streets for 3 hours."></textarea>
+    </label>
+    <label>Photo or document link <span class="optional">Optional</span>
+      <input id="proofUrl" type="url" placeholder="https://... a link to a photo, Drive file, or social post">
+    </label>
+    <p class="caption">There's no file upload yet — paste a link if you have visual proof. Your organizer can also verify from what they saw in person.</p>
+    <div class="form-actions">
+      <button id="submitBtn" class="btn btn-primary" type="submit">Submit for organizer review</button>
+    </div>
+  </form>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="participation.js"></script>
+<script src="completion.js"></script>
+<script>
+(function () {
+  "use strict";
+  const P = window.IQParticipation;
+  const C = window.IQCompletion;
+  const questId = new URLSearchParams(location.search).get("id");
+  const msgEl = document.getElementById("msg");
+
+  function say(text, type = "error") {
+    msgEl.textContent = text;
+    msgEl.className = `quest-message ${type}`;
+    msgEl.hidden = false;
+  }
+
+  async function init() {
+    if (!questId) { say("No quest was specified."); return; }
+    const user = await C.currentUserOrNull();
+    if (!user) { location.href = `login.html?next=${encodeURIComponent(location.pathname + location.search)}`; return; }
+
+    document.getElementById("backLink").href = `quest-details.html?id=${encodeURIComponent(questId)}`;
+
+    const { data: quest, error } = await P.fetchQuest(questId);
+    if (error || !quest) { say("This quest could not be found."); return; }
+    document.getElementById("pageTitle").textContent = `Submit completion — ${quest.title}`;
+
+    const attendance = await C.getMyAttendance(questId, user.id);
+    if (attendance && attendance.status !== "pending") {
+      document.getElementById("alreadyDecided").hidden = false;
+      document.getElementById("decidedText").textContent =
+        attendance.status === "present"
+          ? "Your organizer confirmed you attended this quest. Check your Profile for the reward."
+          : "Your organizer recorded this as a no-show." + (attendance.review_notes ? ` Note: ${attendance.review_notes}` : "");
+      return;
+    }
+
+    const form = document.getElementById("completionForm");
+    form.hidden = false;
+    if (attendance) {
+      document.getElementById("proofText").value = attendance.proof_text || "";
+      document.getElementById("proofUrl").value = attendance.proof_url || "";
+      document.getElementById("submitBtn").textContent = "Update submission";
+      say("You already submitted proof for this quest — it's still awaiting organizer review. You can update it below.", "info");
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const proofText = document.getElementById("proofText").value.trim();
+      const proofUrl = document.getElementById("proofUrl").value.trim();
+      const btn = document.getElementById("submitBtn");
+      btn.disabled = true;
+      btn.textContent = "Submitting…";
+      const { error } = await C.submitCompletion(questId, proofText, proofUrl);
+      btn.disabled = false;
+      if (error) {
+        say(error.message);
+        btn.textContent = "Submit for organizer review";
+        return;
+      }
+      say("Submitted! Your organizer will review it soon.", "success");
+      btn.textContent = "Submitted ✓";
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+})();
+</script>
+</body>
+</html>

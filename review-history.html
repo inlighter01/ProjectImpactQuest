@@ -1,1 +1,83 @@
-<!doctype html><html><head><title>Review History</title><link rel="stylesheet" href="style.css"></head><body><h1>Review History</h1></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Completion History · Impact Quest</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0B0A08">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="quest-container">
+  <a class="auth-back" href="profile.html">← Profile</a>
+  <header class="page-header">
+    <p class="eyebrow">Proof of Impact</p>
+    <h1>Your Completion History</h1>
+    <p>Every quest you've submitted proof of completion for, and what your organizer decided.</p>
+  </header>
+
+  <p id="msg" class="quest-message" hidden aria-live="polite"></p>
+  <div id="list" class="quest-list"><p class="quest-message">Loading…</p></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="participation.js"></script>
+<script src="completion.js"></script>
+<script>
+(function () {
+  "use strict";
+  const P = window.IQParticipation;
+  const C = window.IQCompletion;
+  const safe = C.safe;
+  const listEl = document.getElementById("list");
+  const msgEl = document.getElementById("msg");
+
+  function say(text, type = "error") {
+    msgEl.textContent = text;
+    msgEl.className = `quest-message ${type}`;
+    msgEl.hidden = false;
+  }
+
+  function statusPill(status) {
+    return { pending: "submitted", present: "approved", no_show: "draft" }[status] || "submitted";
+  }
+  function statusLabel(status) {
+    return { pending: "Awaiting review", present: "Confirmed present", no_show: "Recorded as no-show" }[status] || status;
+  }
+
+  function row(a) {
+    const q = a.quests || {};
+    return `<article class="quest-card">
+      <span class="status-pill ${statusPill(a.status)}">${statusLabel(a.status)}</span>
+      <h2>${safe(q.title || "Quest")}</h2>
+      <p class="quest-meta">${safe(q.category || "")} · Submitted ${C.timeAgo(a.submitted_at)}</p>
+      <p>${safe(a.proof_text)}</p>
+      ${a.review_notes ? `<p class="quest-meta">Organizer note: ${safe(a.review_notes)}</p>` : ""}
+      ${q.id ? `<a class="btn btn-outline" href="quest-details.html?id=${encodeURIComponent(q.id)}">View Quest</a>` : ""}
+    </article>`;
+  }
+
+  async function init() {
+    const user = await C.currentUserOrNull();
+    if (!user) { location.href = "login.html?next=" + encodeURIComponent(location.pathname); return; }
+
+    const { data, error } = await C.loadMyCompletionHistory(user.id);
+    if (error) { say(error.message); listEl.innerHTML = ""; return; }
+    if (!data.length) {
+      listEl.innerHTML = `<section class="empty-state"><h2>No completions submitted yet.</h2><p>Once you've joined and attended a quest, submit proof from the Quest Details page.</p><a class="btn btn-primary" href="my-quests.html">View My Quests</a></section>`;
+      return;
+    }
+    listEl.innerHTML = data.map(row).join("");
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+})();
+</script>
+</body>
+</html>

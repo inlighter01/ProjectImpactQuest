@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quest Lobby · Impact Quest</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0a0e27">
+<meta name="theme-color" content="#0B0A08">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -61,6 +61,7 @@
           <button class="btn btn-primary" id="announceBtn" type="button">Post</button>
         </div>
         <div class="form-actions" style="margin-top:1rem">
+          <a class="btn btn-outline" href="#" id="reviewCompletionsLink" hidden>Review Completions</a>
           <button class="btn btn-outline" id="cancelQuestBtn" type="button">Cancel this quest</button>
         </div>
       </article>
@@ -191,6 +192,11 @@
       document.getElementById("organizerToolsCard").hidden = false;
       document.getElementById("announceBtn").addEventListener("click", postAnnouncement);
       document.getElementById("cancelQuestBtn").addEventListener("click", cancelQuest);
+      if (quest.quest_date && new Date(quest.quest_date + "T00:00:00") <= new Date()) {
+        const reviewLink = document.getElementById("reviewCompletionsLink");
+        reviewLink.hidden = false;
+        reviewLink.href = `completion-review.html?id=${encodeURIComponent(quest.id)}`;
+      }
     }
 
     await loadActivity();

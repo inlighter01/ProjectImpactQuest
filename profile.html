@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My Profile – Impact Quest</title>
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0a0e27">
+  <meta name="theme-color" content="#0B0A08">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -26,6 +26,8 @@
         <a href="community-feed.html" class="btn btn--primary">Explore Quests</a>
         <a href="my-quests.html" class="btn btn--secondary">My Quests</a>
         <a href="create-quest.html" class="btn btn--secondary">Create a Quest</a>
+        <a href="leaderboard.html" class="btn btn--secondary">Leaderboard</a>
+        <a href="review-history.html" class="btn btn--secondary">Completion History</a>
         <a href="moderator-dashboard.html" class="btn btn--secondary">Moderator Dashboard</a>
         <a href="edit-profile.html" class="btn btn--primary">Edit Profile</a>
         <a href="public-profile.html" class="btn btn--secondary">View Public Profile</a>
@@ -41,6 +43,16 @@
         <div class="progress-linear__bar" id="completion-bar" style="width: 0%;"></div>
       </div>
       <p id="completion-text" class="caption">0% complete</p>
+    </div>
+
+    <!-- Level & Progress -->
+    <div class="profile-card glass-card" style="margin-top: var(--space-md);">
+      <h3>Level &amp; Progress</h3>
+      <p><strong id="level-title">Level 1 · Newcomer</strong></p>
+      <div class="progress-linear" style="margin: var(--space-xs) 0;">
+        <div class="progress-linear__bar" id="xp-bar" style="width: 0%;"></div>
+      </div>
+      <p id="xp-text" class="caption">0 XP</p>
     </div>
 
     <!-- Profile Details -->
@@ -89,9 +101,7 @@
     <div class="profile-card glass-card" style="margin-top: var(--space-md);">
       <h3>Community Badges</h3>
       <div class="badges-placeholder" id="badges-container">
-        <span class="badge badge--verified">Verified Member</span>
-        <span class="badge badge--new">Founding Member</span>
-        <!-- Additional placeholder badges -->
+        <p class="caption">Loading badges…</p>
       </div>
       <p class="caption">Badges are earned through participation and trust.</p>
     </div>
@@ -104,6 +114,12 @@
         <div class="rep-stat"><strong id="stat-completed">0</strong><span>Quests Completed</span></div>
         <div class="rep-stat"><a class="btn btn--secondary" href="my-quests.html" style="width:100%;box-sizing:border-box">View My Quests</a></div>
       </div>
+    </div>
+
+    <!-- Reputation History -->
+    <div class="profile-card glass-card" style="margin-top: var(--space-md);">
+      <h3>Reputation History</h3>
+      <div id="reputation-history"><p class="caption">Loading…</p></div>
     </div>
 
     <!-- Verification Status -->
@@ -124,6 +140,7 @@
   <script src="auth.js"></script>
   <script src="profile.js"></script>
   <script src="participation.js"></script>
+  <script src="completion.js"></script>
   <script src="notifications.js"></script>
   <script>
     if (!isConfigured) window.location.href = 'index.html';
@@ -187,8 +204,40 @@
         document.getElementById('stat-joined').textContent = profile.joined_quests_count || 0;
         document.getElementById('stat-completed').textContent = profile.completed_quests_count || 0;
 
-        // Badges placeholder (static for now)
-        // Already in HTML
+        // Level & XP progress (v0.11.0)
+        const C = window.IQCompletion;
+        const { data: levels } = await C.loadXpLevels();
+        if (levels && levels.length) {
+          const progress = C.levelProgress(levels, profile.xp || 0, profile.level || 1);
+          document.getElementById('level-title').textContent = `Level ${profile.level || 1} · ${progress.title}`;
+          document.getElementById('xp-bar').style.width = progress.percent + '%';
+          document.getElementById('xp-text').textContent = progress.label;
+        }
+
+        // Badges: real catalog + what this member has actually earned (v0.11.0)
+        const [{ data: allBadges }, { data: earned }] = await Promise.all([
+          C.loadAllBadges(),
+          C.loadEarnedBadges(profile.id),
+        ]);
+        const earnedCodes = new Set((earned || []).map((e) => e.badges?.code));
+        const badgesEl = document.getElementById('badges-container');
+        if (allBadges && allBadges.length) {
+          badgesEl.innerHTML = allBadges.map((b) => {
+            const isEarned = earnedCodes.has(b.code);
+            return `<span class="badge badge--featured" title="${b.description}" style="${isEarned ? '' : 'opacity:.35;filter:grayscale(1);'}">${b.icon} ${b.name}</span>`;
+          }).join(' ');
+        } else {
+          badgesEl.innerHTML = '<p class="caption">No badges available yet.</p>';
+        }
+
+        // Reputation History (v0.11.0)
+        const { data: history } = await C.loadReputationHistory(profile.id, 10);
+        const historyEl = document.getElementById('reputation-history');
+        if (history && history.length) {
+          historyEl.innerHTML = history.map((h) => `<p class="quest-meta" style="margin:.35rem 0">${h.description}</p>`).join('');
+        } else {
+          historyEl.innerHTML = '<p class="caption">Nothing yet — join and complete a quest to start building your history.</p>';
+        }
 
       } catch (err) {
         document.getElementById('profile-error').textContent = 'Failed to load profile.';

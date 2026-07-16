@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leaderboard · Impact Quest</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0B0A08">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="quest-container">
+  <a class="auth-back" href="profile.html">← Profile</a>
+  <header class="page-header">
+    <p class="eyebrow">Community Reputation</p>
+    <h1>Leaderboard</h1>
+    <p>Ranked by Impact Points, then Trust Score. Grow yours by joining and completing quests.</p>
+  </header>
+
+  <p id="msg" class="quest-message" hidden aria-live="polite"></p>
+  <div id="list" class="participant-list"><p class="quest-message">Loading…</p></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="completion.js"></script>
+<script>
+(function () {
+  "use strict";
+  const C = window.IQCompletion;
+  const safe = C.safe;
+  const listEl = document.getElementById("list");
+  const msgEl = document.getElementById("msg");
+
+  function say(text, type = "error") {
+    msgEl.textContent = text;
+    msgEl.className = `quest-message ${type}`;
+    msgEl.hidden = false;
+  }
+
+  const RANK_ICON = { 1: "🥇", 2: "🥈", 3: "🥉" };
+
+  function row(member, rank, isMe) {
+    const initial = (member.display_name || "?")[0].toUpperCase();
+    return `<div class="participant-row" style="${isMe ? "border-color: var(--gold,#e7bb63);" : ""}">
+      <div class="avatar-sm">${RANK_ICON[rank] || rank}</div>
+      <div class="participant-info">
+        <div class="participant-name">${safe(member.display_name || "Community member")}${isMe ? " (you)" : ""}</div>
+        <div class="participant-meta">
+          <span>Level ${member.level} · ${member.xp} XP</span>
+          <span>${member.impact_points} Impact Points</span>
+          <span>Trust ${Number(member.trust_score || 0).toFixed(1)}</span>
+          <span>${member.completed_quests_count} completed</span>
+          <span>${member.badge_count} 🏅</span>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  async function init() {
+    const { data: { user } } = await window.supabaseClient.auth.getUser();
+    const { data, error } = await C.getLeaderboard(20);
+    if (error) { say(error.message); listEl.innerHTML = ""; return; }
+    if (!data.length) {
+      listEl.innerHTML = `<section class="empty-state"><h2>No one has earned Impact Points yet.</h2><p>Be the first — join and complete a Community Quest.</p><a class="btn btn-primary" href="community-feed.html">Browse Quests</a></section>`;
+      return;
+    }
+    listEl.innerHTML = data.map((m, i) => row(m, i + 1, user && user.id === m.user_id)).join("");
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+})();
+</script>
+</body>
+</html>

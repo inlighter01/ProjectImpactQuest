@@ -16,6 +16,11 @@
     quest_cancelled: "🚫",
     quest_reminder: "⏰",
     new_participant: "🙋",
+    completion_submitted: "📝",
+    completion_approved: "✅",
+    completion_rejected: "❗",
+    badge_earned: "🏅",
+    level_up: "⬆️",
   };
 
   async function loadNotifications(limit = 50) {

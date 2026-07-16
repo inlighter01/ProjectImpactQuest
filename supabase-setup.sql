@@ -600,3 +600,433 @@ using (
   public.quest_creator(quest_activity.quest_id) = auth.uid()
   or public.is_quest_participant(quest_activity.quest_id, auth.uid())
 );
+
+-- ============================================================
+-- Impact Quest v0.11.0 — Community Reputation & Achievement System
+-- Safe to run more than once (idempotent).
+--
+-- Adds: XP/Level progression, tunable reputation scoring, an
+-- attendance-verified quest completion flow (volunteer submits proof,
+-- organizer confirms present/no-show), achievements/badges, a
+-- reputation history ledger, and a global leaderboard.
+--
+-- Follows the v0.10.1 convention throughout: every cross-table check
+-- goes through a small SECURITY DEFINER function, never a raw
+-- cross-table RLS subquery, to avoid recursive policy evaluation.
+-- ============================================================
+
+-- ---------- XP / Level columns on profiles ----------
+alter table public.profiles add column if not exists xp integer not null default 0 check (xp >= 0);
+alter table public.profiles add column if not exists level integer not null default 1 check (level >= 1);
+
+-- ---------- Tunable scoring constants (server-side only, never exposed to clients) ----------
+create table if not exists public.reputation_config (
+  key text primary key,
+  value numeric not null,
+  description text not null default '',
+  updated_at timestamptz not null default now()
+);
+
+insert into public.reputation_config (key, value, description) values
+  ('xp_per_completed_quest', 25, 'XP awarded when an organizer confirms a volunteer attended a quest.'),
+  ('impact_points_per_completed_quest', 10, 'Impact Points awarded per confirmed quest completion.'),
+  ('trust_score_gain_per_completion', 0.2, 'Trust Score increase per confirmed quest completion (capped at 10).'),
+  ('trust_score_penalty_per_no_show', 0.5, 'Trust Score decrease when an organizer records a no-show (floored at 0).'),
+  ('people_helped_per_completion', 1, 'People Helped counter increase per confirmed quest completion.')
+on conflict (key) do nothing;
+
+alter table public.reputation_config enable row level security;
+-- Intentionally no select/insert/update policies for any client role. These
+-- constants are read only from inside SECURITY DEFINER functions below,
+-- which run as the table owner and bypass RLS. Tune values directly in the
+-- Supabase SQL Editor: update public.reputation_config set value = ... where key = '...';
+
+-- ---------- XP thresholds per level ----------
+create table if not exists public.xp_levels (
+  level integer primary key check (level >= 1),
+  xp_required integer not null check (xp_required >= 0),
+  title text not null
+);
+
+insert into public.xp_levels (level, xp_required, title) values
+  (1, 0, 'Newcomer'),
+  (2, 100, 'Helper'),
+  (3, 250, 'Contributor'),
+  (4, 500, 'Changemaker'),
+  (5, 1000, 'Champion'),
+  (6, 2000, 'Community Hero'),
+  (7, 4000, 'Legend')
+on conflict (level) do nothing;
+
+alter table public.xp_levels enable row level security;
+drop policy if exists "Anyone can read xp levels" on public.xp_levels;
+create policy "Anyone can read xp levels" on public.xp_levels for select using (true);
+
+-- ---------- Badge catalog ----------
+create table if not exists public.badges (
+  id uuid primary key default gen_random_uuid(),
+  code text not null unique,
+  name text not null,
+  description text not null,
+  icon text not null default '🏅',
+  criteria_type text not null check (criteria_type in ('quests_completed','trust_score','impact_points','people_helped','joined_quests')),
+  criteria_value numeric not null,
+  created_at timestamptz not null default now()
+);
+
+insert into public.badges (code, name, description, icon, criteria_type, criteria_value) values
+  ('first_quest', 'First Steps', 'Completed your first quest.', '🌱', 'quests_completed', 1),
+  ('five_quests', 'Dedicated Volunteer', 'Completed 5 quests.', '🔥', 'quests_completed', 5),
+  ('ten_quests', 'Community Pillar', 'Completed 10 quests.', '🏛️', 'quests_completed', 10),
+  ('twentyfive_quests', 'Impact Veteran', 'Completed 25 quests.', '🎖️', 'quests_completed', 25),
+  ('trust_builder', 'Trust Builder', 'Reached a Trust Score of 5.0.', '🤝', 'trust_score', 5),
+  ('trusted_pillar', 'Trusted Pillar', 'Reached a Trust Score of 9.0.', '⭐', 'trust_score', 9),
+  ('point_collector', 'Point Collector', 'Earned 100 Impact Points.', '💠', 'impact_points', 100),
+  ('impact_master', 'Impact Master', 'Earned 500 Impact Points.', '👑', 'impact_points', 500),
+  ('helping_hand', 'Helping Hand', 'Helped 10 people through completed quests.', '🙌', 'people_helped', 10),
+  ('community_champion', 'Community Champion', 'Helped 50 people through completed quests.', '🏆', 'people_helped', 50)
+on conflict (code) do nothing;
+
+alter table public.badges enable row level security;
+drop policy if exists "Anyone can read the badge catalog" on public.badges;
+create policy "Anyone can read the badge catalog" on public.badges for select using (true);
+
+-- ---------- Earned badges ----------
+create table if not exists public.profile_badges (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid references public.profiles(id) on delete cascade not null,
+  badge_id uuid references public.badges(id) on delete cascade not null,
+  earned_at timestamptz not null default now(),
+  unique (profile_id, badge_id)
+);
+
+create index if not exists profile_badges_profile_id_idx on public.profile_badges(profile_id);
+
+alter table public.profile_badges enable row level security;
+drop policy if exists "Anyone signed in can view earned badges" on public.profile_badges;
+create policy "Anyone signed in can view earned badges" on public.profile_badges for select
+using (auth.uid() is not null);
+-- No insert/update/delete policy: badges are only ever awarded by
+-- check_and_award_badges() below, a SECURITY DEFINER function.
+
+-- ---------- Reputation history ledger ----------
+create table if not exists public.reputation_history (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid references public.profiles(id) on delete cascade not null,
+  quest_id uuid references public.quests(id) on delete set null,
+  event_type text not null check (event_type in ('quest_completed','no_show','badge_earned','level_up')),
+  xp_delta integer not null default 0,
+  impact_points_delta integer not null default 0,
+  trust_score_delta numeric(4,2) not null default 0,
+  description text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists reputation_history_profile_id_created_at_idx on public.reputation_history(profile_id, created_at desc);
+
+create or replace function public.owns_profile(p_profile_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.profiles where id = p_profile_id and user_id = auth.uid());
+$$;
+
+alter table public.reputation_history enable row level security;
+drop policy if exists "Users can view their own reputation history" on public.reputation_history;
+create policy "Users can view their own reputation history" on public.reputation_history for select
+using (public.owns_profile(profile_id));
+-- No insert/update/delete policy: history rows are only ever written by the
+-- SECURITY DEFINER functions below.
+
+-- ---------- Quest attendance / completion verification ----------
+create table if not exists public.quest_attendance (
+  id uuid primary key default gen_random_uuid(),
+  quest_id uuid references public.quests(id) on delete cascade not null,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  proof_text text not null default '',
+  proof_url text,
+  submitted_at timestamptz,
+  status text not null default 'pending' check (status in ('pending','present','no_show')),
+  reviewed_by uuid references auth.users(id),
+  reviewed_at timestamptz,
+  review_notes text,
+  created_at timestamptz not null default now(),
+  unique (quest_id, user_id)
+);
+
+create index if not exists quest_attendance_quest_id_idx on public.quest_attendance(quest_id);
+create index if not exists quest_attendance_user_id_idx on public.quest_attendance(user_id);
+
+alter table public.quest_attendance enable row level security;
+drop policy if exists "Volunteers can view their own attendance record" on public.quest_attendance;
+drop policy if exists "Organizers can view attendance for their quests" on public.quest_attendance;
+create policy "Volunteers can view their own attendance record" on public.quest_attendance for select
+using (auth.uid() = user_id);
+create policy "Organizers can view attendance for their quests" on public.quest_attendance for select
+using (public.quest_creator(quest_id) = auth.uid());
+-- No insert/update policy: rows are only ever written by
+-- submit_quest_completion() and decide_quest_completion() below, which
+-- enforce the business rules (must be a joined participant, quest date
+-- must have passed, only the organizer may decide, no re-deciding).
+
+-- ---------- Notifications: new v0.11.0 types ----------
+alter table public.notifications drop constraint if exists notifications_type_check;
+alter table public.notifications add constraint notifications_type_check
+  check (type in (
+    'quest_joined','quest_left','quest_approved','quest_rejected',
+    'organizer_announcement','quest_cancelled','quest_reminder','new_participant',
+    'completion_submitted','completion_approved','completion_rejected','badge_earned','level_up'
+  ));
+
+-- ============================================================
+-- Recompute a profile's level from its current XP and, if it just
+-- crossed a threshold, log it and notify the member. Called only from
+-- decide_quest_completion() below, never directly by clients.
+-- ============================================================
+create or replace function public.recompute_level(p_user_id uuid, p_profile_id uuid, p_quest_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_xp integer;
+  v_old_level integer;
+  v_new_level integer;
+  v_title text;
+begin
+  select xp, level into v_xp, v_old_level from public.profiles where id = p_profile_id;
+
+  select level into v_new_level from public.xp_levels
+    where xp_required <= v_xp order by level desc limit 1;
+
+  if v_new_level is null or v_new_level = v_old_level then
+    return;
+  end if;
+
+  select title into v_title from public.xp_levels where level = v_new_level;
+
+  update public.profiles set level = v_new_level where id = p_profile_id;
+
+  insert into public.reputation_history (profile_id, quest_id, event_type, description)
+    values (p_profile_id, p_quest_id, 'level_up', 'Reached Level ' || v_new_level || ' — ' || v_title || '.');
+
+  insert into public.notifications (user_id, type, title, body, quest_id)
+    values (p_user_id, 'level_up', 'Level up!', 'You reached Level ' || v_new_level || ' — ' || v_title || '.', p_quest_id);
+end;
+$$;
+
+-- ============================================================
+-- Award any newly-qualifying badges for a profile. Called only from
+-- decide_quest_completion() below, never directly by clients.
+-- ============================================================
+create or replace function public.check_and_award_badges(p_profile_id uuid, p_quest_id uuid default null)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_profile record;
+  v_user_id uuid;
+  v_badge record;
+  v_qualifies boolean;
+begin
+  select * into v_profile from public.profiles where id = p_profile_id;
+  v_user_id := v_profile.user_id;
+
+  for v_badge in
+    select b.* from public.badges b
+    where not exists (
+      select 1 from public.profile_badges pb where pb.profile_id = p_profile_id and pb.badge_id = b.id
+    )
+  loop
+    v_qualifies := case v_badge.criteria_type
+      when 'quests_completed' then v_profile.completed_quests_count >= v_badge.criteria_value
+      when 'trust_score' then v_profile.trust_score >= v_badge.criteria_value
+      when 'impact_points' then v_profile.impact_points >= v_badge.criteria_value
+      when 'people_helped' then v_profile.people_helped_count >= v_badge.criteria_value
+      when 'joined_quests' then v_profile.joined_quests_count >= v_badge.criteria_value
+      else false
+    end;
+
+    if v_qualifies then
+      insert into public.profile_badges (profile_id, badge_id) values (p_profile_id, v_badge.id)
+        on conflict (profile_id, badge_id) do nothing;
+
+      insert into public.reputation_history (profile_id, quest_id, event_type, description)
+        values (p_profile_id, p_quest_id, 'badge_earned', 'Earned the "' || v_badge.name || '" badge.');
+
+      insert into public.notifications (user_id, type, title, body, quest_id)
+        values (v_user_id, 'badge_earned', 'New badge earned', 'You earned the "' || v_badge.name || '" badge: ' || v_badge.description, p_quest_id);
+    end if;
+  end loop;
+end;
+$$;
+
+-- ============================================================
+-- RPC: a volunteer submits proof of completion for a quest they joined,
+-- after the quest date has passed. Upserts a pending attendance record;
+-- cannot overwrite a record the organizer has already decided.
+-- ============================================================
+create or replace function public.submit_quest_completion(p_quest_id uuid, p_proof_text text, p_proof_url text default null)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_quest record;
+  v_participation record;
+  v_existing record;
+  v_display_name text;
+begin
+  if p_proof_text is null or length(trim(p_proof_text)) < 5 then
+    raise exception 'Please describe what you did, in a few words.';
+  end if;
+
+  select id, title, creator_id, quest_date into v_quest from public.quests where id = p_quest_id;
+  if v_quest.id is null then
+    raise exception 'Quest not found';
+  end if;
+
+  if v_quest.quest_date is null or v_quest.quest_date > current_date then
+    raise exception 'You can submit proof of completion once the quest date has passed.';
+  end if;
+
+  select id, status into v_participation from public.quest_participants
+    where quest_id = p_quest_id and user_id = auth.uid();
+  if v_participation.id is null or v_participation.status not in ('joined', 'completed') then
+    raise exception 'Only volunteers who joined this quest can submit proof of completion.';
+  end if;
+
+  select status into v_existing from public.quest_attendance
+    where quest_id = p_quest_id and user_id = auth.uid();
+  if v_existing.status is not null and v_existing.status <> 'pending' then
+    raise exception 'This quest''s completion has already been reviewed by the organizer.';
+  end if;
+
+  insert into public.quest_attendance (quest_id, user_id, proof_text, proof_url, submitted_at, status)
+    values (p_quest_id, auth.uid(), trim(p_proof_text), p_proof_url, now(), 'pending')
+  on conflict (quest_id, user_id) do update
+    set proof_text = excluded.proof_text, proof_url = excluded.proof_url, submitted_at = now(), status = 'pending';
+
+  select coalesce(display_name, 'A community member') into v_display_name
+    from public.profiles where user_id = auth.uid();
+
+  insert into public.quest_activity (quest_id, actor_id, type, message)
+    values (p_quest_id, auth.uid(), 'system', v_display_name || ' submitted proof of completion for organizer review.');
+
+  insert into public.notifications (user_id, type, title, body, quest_id)
+    values (v_quest.creator_id, 'completion_submitted', 'Completion submitted for review', v_display_name || ' submitted proof of completion for "' || v_quest.title || '".', p_quest_id);
+end;
+$$;
+
+-- ============================================================
+-- RPC: the organizer confirms a volunteer's attendance (present or
+-- no-show). On 'present', this is the single place reputation is
+-- actually awarded: XP, Impact Points, Trust Score, People Helped,
+-- the level-up check, and the badge check all happen here, inside one
+-- transaction, keyed off the tunable reputation_config values.
+-- ============================================================
+create or replace function public.decide_quest_completion(p_quest_id uuid, p_target_user_id uuid, p_decision text, p_notes text default null)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_quest record;
+  v_attendance record;
+  v_profile record;
+  v_xp_gain integer;
+  v_points_gain integer;
+  v_trust_gain numeric;
+  v_trust_penalty numeric;
+  v_people_gain integer;
+begin
+  if p_decision not in ('present', 'no_show') then
+    raise exception 'Decision must be "present" or "no_show".';
+  end if;
+
+  select id, title, creator_id into v_quest from public.quests where id = p_quest_id;
+  if v_quest.id is null or v_quest.creator_id <> auth.uid() then
+    raise exception 'Only the organizer of this quest can review attendance.';
+  end if;
+
+  select * into v_attendance from public.quest_attendance
+    where quest_id = p_quest_id and user_id = p_target_user_id;
+  if v_attendance.id is null or v_attendance.status <> 'pending' then
+    raise exception 'No pending completion submission was found for this volunteer.';
+  end if;
+
+  update public.quest_attendance
+    set status = p_decision, reviewed_by = auth.uid(), reviewed_at = now(), review_notes = p_notes
+    where id = v_attendance.id;
+
+  if p_decision = 'present' then
+    update public.quest_participants set status = 'completed'
+      where quest_id = p_quest_id and user_id = p_target_user_id and status = 'joined';
+
+    select value into v_xp_gain from public.reputation_config where key = 'xp_per_completed_quest';
+    select value into v_points_gain from public.reputation_config where key = 'impact_points_per_completed_quest';
+    select value into v_trust_gain from public.reputation_config where key = 'trust_score_gain_per_completion';
+    select value into v_people_gain from public.reputation_config where key = 'people_helped_per_completion';
+
+    update public.profiles set
+        xp = xp + v_xp_gain,
+        impact_points = impact_points + v_points_gain,
+        trust_score = least(10, trust_score + v_trust_gain),
+        completed_quests_count = completed_quests_count + 1,
+        people_helped_count = people_helped_count + v_people_gain
+      where user_id = p_target_user_id
+      returning * into v_profile;
+
+    insert into public.reputation_history (profile_id, quest_id, event_type, xp_delta, impact_points_delta, trust_score_delta, description)
+      values (v_profile.id, p_quest_id, 'quest_completed', v_xp_gain, v_points_gain, v_trust_gain, 'Completed "' || v_quest.title || '".');
+
+    insert into public.notifications (user_id, type, title, body, quest_id)
+      values (p_target_user_id, 'completion_approved', 'Quest completion confirmed', 'Your organizer confirmed you attended "' || v_quest.title || '". +' || v_xp_gain || ' XP, +' || v_points_gain || ' Impact Points.', p_quest_id);
+
+    perform public.recompute_level(p_target_user_id, v_profile.id, p_quest_id);
+    perform public.check_and_award_badges(v_profile.id, p_quest_id);
+  else
+    select value into v_trust_penalty from public.reputation_config where key = 'trust_score_penalty_per_no_show';
+
+    update public.profiles set trust_score = greatest(0, trust_score - v_trust_penalty)
+      where user_id = p_target_user_id
+      returning * into v_profile;
+
+    insert into public.reputation_history (profile_id, quest_id, event_type, trust_score_delta, description)
+      values (v_profile.id, p_quest_id, 'no_show', -v_trust_penalty, 'Recorded as a no-show for "' || v_quest.title || '".');
+
+    insert into public.notifications (user_id, type, title, body, quest_id)
+      values (p_target_user_id, 'completion_rejected', 'Attendance not confirmed', 'Your organizer recorded a no-show for "' || v_quest.title || '".' || case when p_notes is not null then ' ' || p_notes else '' end, p_quest_id);
+  end if;
+end;
+$$;
+
+-- ============================================================
+-- RPC: global leaderboard. Returns only the whitelisted columns
+-- meant to be public, regardless of the profiles table's own RLS.
+-- ============================================================
+create or replace function public.get_leaderboard(p_limit integer default 20)
+returns table (
+  user_id uuid, display_name text, avatar_url text, level integer, xp integer,
+  impact_points integer, trust_score numeric, completed_quests_count integer, badge_count bigint
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p.user_id, p.display_name, p.avatar_url, p.level, p.xp,
+         p.impact_points, p.trust_score, p.completed_quests_count,
+         (select count(*) from public.profile_badges pb where pb.profile_id = p.id) as badge_count
+  from public.profiles p
+  order by p.impact_points desc, p.trust_score desc, p.xp desc
+  limit greatest(1, least(p_limit, 100));
+$$;
