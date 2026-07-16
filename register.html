@@ -12,7 +12,32 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="auth-page">
+  <div id="ember-field" aria-hidden="true"></div>
   <main class="auth-container">
+    <div class="spirit-orb-wrap">
+      <div class="spirit-orb" tabindex="0" role="img" aria-label="Ember, your Impact Quest guide">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="orbHaloGrad2" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#E8C55A" stop-opacity="0.55"/>
+              <stop offset="100%" stop-color="#A83240" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="orbCoreGrad2" cx="40%" cy="35%" r="65%">
+              <stop offset="0%" stop-color="#FCEFC7"/>
+              <stop offset="55%" stop-color="#E8C55A"/>
+              <stop offset="100%" stop-color="#A83240"/>
+            </radialGradient>
+          </defs>
+          <circle class="spirit-orb__halo" cx="50" cy="50" r="46" fill="url(#orbHaloGrad2)"/>
+          <circle class="spirit-orb__ring" cx="50" cy="50" r="40" fill="none" stroke="#C9A227" stroke-width="1.2" stroke-dasharray="3 8" opacity="0.6"/>
+          <circle class="spirit-orb__sparkle" cx="18" cy="34" r="2" fill="#E8C55A"/>
+          <circle class="spirit-orb__sparkle" cx="82" cy="40" r="1.6" fill="#E8C55A"/>
+          <circle class="spirit-orb__sparkle" cx="22" cy="70" r="1.6" fill="#E8C55A"/>
+          <circle class="spirit-orb__core" cx="50" cy="50" r="22" fill="url(#orbCoreGrad2)"/>
+        </svg>
+      </div>
+      <p class="guide-speech spirit-orb__greeting">Hi! Ready to start your quest? 👋</p>
+    </div>
     <div class="auth-card glass-card">
       <h1 class="section__title">Join the movement</h1>
       <p class="subtitle">Create your account and start making a difference.</p>
